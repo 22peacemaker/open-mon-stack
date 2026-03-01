@@ -191,7 +191,7 @@ func TestAgentCatalog(t *testing.T) {
 
 func TestGetStackConfig(t *testing.T) {
 	e := newEcho()
-	h := handlers.NewStackHandler(newStore(t), t.TempDir())
+	h := handlers.NewStackHandler(newStore(t), t.TempDir(), 8080)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/stack/config", nil)
 	rec := httptest.NewRecorder()
@@ -208,7 +208,7 @@ func TestGetStackConfig(t *testing.T) {
 func TestSaveStackConfig(t *testing.T) {
 	e := newEcho()
 	store := newStore(t)
-	h := handlers.NewStackHandler(store, t.TempDir())
+	h := handlers.NewStackHandler(store, t.TempDir(), 8080)
 
 	body := `{"grafana_port":4000,"prometheus_port":9999,"loki_port":4100,"data_dir":"/custom"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/stack/config", strings.NewReader(body))
@@ -225,7 +225,7 @@ func TestSaveStackConfig(t *testing.T) {
 
 func TestGetStackStatus(t *testing.T) {
 	e := newEcho()
-	h := handlers.NewStackHandler(newStore(t), t.TempDir())
+	h := handlers.NewStackHandler(newStore(t), t.TempDir(), 8080)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/stack/status", nil)
 	rec := httptest.NewRecorder()

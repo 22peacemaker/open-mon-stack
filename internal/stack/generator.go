@@ -26,18 +26,27 @@ type prometheusTemplateData struct {
 }
 
 type prometheusTarget struct {
-	ID             string
-	Name           string
-	Host           string
-	Labels         map[string]string
+	ID              string
+	Name            string
+	Host            string
+	Labels          map[string]string
 	HasNodeExporter bool
-	HasCAdvisor    bool
+	HasCAdvisor     bool
+}
+
+type alertmanagerTemplateData struct {
+	OmsPort int
+}
+
+type alertRulesTemplateData struct {
+	Rules []*models.AlertRule
 }
 
 // WriteConfigs writes all central stack config files to outDir.
-func (g *Generator) WriteConfigs(outDir string, cfg models.StackConfig, targets []*models.Target) error {
+func (g *Generator) WriteConfigs(outDir string, cfg models.StackConfig, targets []*models.Target, omsPort int, rules []*models.AlertRule) error {
 	dirs := []string{
 		filepath.Join(outDir, "prometheus"),
+		filepath.Join(outDir, "alertmanager"),
 		filepath.Join(outDir, "grafana", "provisioning", "datasources"),
 		filepath.Join(outDir, "grafana", "provisioning", "dashboards"),
 		filepath.Join(outDir, "loki"),
@@ -48,11 +57,20 @@ func (g *Generator) WriteConfigs(outDir string, cfg models.StackConfig, targets 
 		}
 	}
 
-	if err := g.renderTemplate("templates/docker-compose.yml.tmpl", filepath.Join(outDir, "docker-compose.yml"), cfg); err != nil {
+	// docker-compose must mount from outDir (where configs are written), not cfg.DataDir
+	composeData := cfg
+	composeData.DataDir = outDir
+	if err := g.renderTemplate("templates/docker-compose.yml.tmpl", filepath.Join(outDir, "docker-compose.yml"), composeData); err != nil {
 		return fmt.Errorf("docker-compose: %w", err)
 	}
 	if err := g.renderTemplate("templates/prometheus/prometheus.yml.tmpl", filepath.Join(outDir, "prometheus", "prometheus.yml"), buildPrometheusData(targets)); err != nil {
 		return fmt.Errorf("prometheus config: %w", err)
+	}
+	if err := g.WriteAlertmanagerConfig(outDir, omsPort); err != nil {
+		return fmt.Errorf("alertmanager config: %w", err)
+	}
+	if err := g.WriteAlertRules(outDir, rules); err != nil {
+		return fmt.Errorf("alert rules: %w", err)
 	}
 
 	staticFiles := map[string]string{
@@ -79,6 +97,24 @@ func (g *Generator) WritePrometheusConfig(outDir string, targets []*models.Targe
 		"templates/prometheus/prometheus.yml.tmpl",
 		filepath.Join(outDir, "prometheus", "prometheus.yml"),
 		buildPrometheusData(targets),
+	)
+}
+
+// WriteAlertmanagerConfig (re)writes alertmanager.yml — used after channel changes.
+func (g *Generator) WriteAlertmanagerConfig(outDir string, omsPort int) error {
+	return g.renderTemplate(
+		"templates/alertmanager/alertmanager.yml.tmpl",
+		filepath.Join(outDir, "alertmanager", "alertmanager.yml"),
+		alertmanagerTemplateData{OmsPort: omsPort},
+	)
+}
+
+// WriteAlertRules (re)writes alerts.yml — used after alert rule changes.
+func (g *Generator) WriteAlertRules(outDir string, rules []*models.AlertRule) error {
+	return g.renderTemplate(
+		"templates/prometheus/alerts.yml.tmpl",
+		filepath.Join(outDir, "prometheus", "alerts.yml"),
+		alertRulesTemplateData{Rules: rules},
 	)
 }
 

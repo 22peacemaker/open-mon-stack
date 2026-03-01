@@ -158,7 +158,7 @@ func TestWriteConfigs(t *testing.T) {
 	g := stack.New()
 	dir := t.TempDir()
 
-	if err := g.WriteConfigs(dir, defaultCfg(), noTargets()); err != nil {
+	if err := g.WriteConfigs(dir, defaultCfg(), noTargets(), 0, nil); err != nil {
 		t.Fatalf("WriteConfigs: %v", err)
 	}
 
@@ -180,7 +180,7 @@ func TestWriteConfigsIdempotent(t *testing.T) {
 	g := stack.New()
 	dir := t.TempDir()
 	for i := 0; i < 2; i++ {
-		if err := g.WriteConfigs(dir, defaultCfg(), noTargets()); err != nil {
+		if err := g.WriteConfigs(dir, defaultCfg(), noTargets(), 0, nil); err != nil {
 			t.Fatalf("WriteConfigs run %d: %v", i+1, err)
 		}
 	}
@@ -190,7 +190,7 @@ func TestWritePrometheusConfig(t *testing.T) {
 	g := stack.New()
 	dir := t.TempDir()
 	// Need the prometheus subdir to exist first
-	if err := g.WriteConfigs(dir, defaultCfg(), noTargets()); err != nil {
+	if err := g.WriteConfigs(dir, defaultCfg(), noTargets(), 0, nil); err != nil {
 		t.Fatalf("WriteConfigs: %v", err)
 	}
 
