@@ -1,0 +1,17 @@
+[Unit]
+Description=Open Mon Stack - Monitoring Manager
+After=network.target
+
+[Service]
+Type=simple
+User=open-mon-stack
+Group=open-mon-stack
+ExecStart=/usr/local/bin/open-mon-stack --port 8080 --data /var/lib/open-mon-stack
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=open-mon-stack
+
+[Install]
+WantedBy=multi-user.target

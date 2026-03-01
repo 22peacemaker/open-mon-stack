@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-950">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Open Mon Stack</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .log-line { font-family: monospace; font-size: 0.78rem; line-height: 1.4; }
+    .pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  </style>
+</head>
+<body class="h-full text-gray-100" x-data="app()" x-init="init()" x-cloak>
+
+  <div class="flex h-full">
+
+    <!-- Sidebar -->
+    <aside class="w-60 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0">
+      <div class="p-4 border-b border-gray-800 flex items-center gap-2.5">
+        <div class="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center font-bold text-sm">O</div>
+        <div>
+          <div class="font-semibold text-sm leading-tight">Open Mon Stack</div>
+          <div class="text-xs text-gray-500">Monitoring Manager</div>
+        </div>
+      </div>
+
+      <nav class="flex-1 p-2 space-y-0.5">
+        <button @click="view='stack'"
+          :class="['stack','stack-config','stack-logs'].includes(view) ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'"
+          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+          Monitoring Stack
+        </button>
+
+        <div x-show="['stack','stack-config','stack-logs'].includes(view)" class="ml-5 space-y-0.5">
+          <button @click="view='stack'" :class="view==='stack'?'text-orange-400':'text-gray-500 hover:text-gray-300'" class="w-full text-left text-xs px-3 py-1.5 rounded transition-colors">↳ Status</button>
+          <button @click="view='stack-config'" :class="view==='stack-config'?'text-orange-400':'text-gray-500 hover:text-gray-300'" class="w-full text-left text-xs px-3 py-1.5 rounded transition-colors">↳ Config</button>
+          <button @click="view='stack-logs'" :class="view==='stack-logs'?'text-orange-400':'text-gray-500 hover:text-gray-300'" class="w-full text-left text-xs px-3 py-1.5 rounded transition-colors">↳ Deploy-Log</button>
+        </div>
+
+        <button @click="view='targets'"
+          :class="['targets','target-detail'].includes(view) ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'"
+          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/></svg>
+          Target Servers
+          <span x-show="targets.length>0" class="ml-auto bg-gray-700 text-gray-300 text-xs rounded-full px-1.5 py-0.5" x-text="targets.length"></span>
+        </button>
+      </nav>
+
+      <div class="p-3 border-t border-gray-800 text-xs text-gray-600">v0.1.0-alpha</div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 overflow-auto">
+
+      <!-- Stack Status -->
+      <div x-show="view==='stack'" class="p-8">
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-2xl font-bold">Monitoring Stack</h1>
+          <div class="flex gap-3">
+            <button @click="deployStack()" :disabled="stackDeploying"
+              :class="stackDeploying ? 'opacity-50 cursor-not-allowed bg-green-700' : 'bg-green-500 hover:bg-green-600'"
+              class="text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-14 9V3z"/></svg>
+              <span x-text="stackDeploying ? 'Deploying…' : 'Deploy Stack'"></span>
+            </button>
+            <button @click="stopStack()" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1" stroke-width="2"/></svg>
+              Stop
+            </button>
+            <button @click="loadStackStatus()" class="text-gray-500 hover:text-white transition-colors p-2 rounded-lg hover:bg-gray-800">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 mb-6">
+          <span :class="{
+            'bg-gray-800 text-gray-400': !stackStatus.state||stackStatus.state==='idle',
+            'bg-blue-900 text-blue-300 pulse': stackStatus.state==='running',
+            'bg-green-900 text-green-300': stackStatus.state==='up',
+            'bg-red-900 text-red-300': stackStatus.state==='failed'
+          }" class="text-xs px-3 py-1 rounded-full capitalize font-medium" x-text="stackStatus.state||'idle'"></span>
+          <span class="text-xs text-gray-500" x-text="stackStatus.updated_at ? 'Updated: ' + new Date(stackStatus.updated_at).toLocaleString() : ''"></span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-6">
+          <template x-for="svc in stackStatus.services||[]" :key="svc.name">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center gap-4">
+              <div :class="svc.running ? 'bg-green-500' : 'bg-gray-600'" class="w-2.5 h-2.5 rounded-full shrink-0"></div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium text-sm capitalize" x-text="svc.name"></div>
+                <div class="text-xs text-gray-500" x-text="svc.running ? 'running' : 'stopped'"></div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="{
+                  'bg-green-900 text-green-300': svc.health==='healthy',
+                  'bg-red-900 text-red-300': svc.health==='unhealthy',
+                  'bg-gray-800 text-gray-400': !svc.health||svc.health==='unknown'
+                }" class="text-xs px-2 py-0.5 rounded-full" x-text="svc.health||'unknown'"></span>
+                <a x-show="svc.running&&svc.port" :href="'http://localhost:'+svc.port" target="_blank"
+                  class="text-xs text-orange-400 hover:text-orange-300 transition-colors">→</a>
+              </div>
+            </div>
+          </template>
+          <div x-show="!stackStatus.services||stackStatus.services.length===0"
+            class="col-span-2 text-center py-12 text-gray-600 bg-gray-900 border border-gray-800 rounded-xl">
+            <p class="text-sm">Stack not deployed yet. Click <strong class="text-gray-400">Deploy Stack</strong> to start.</p>
+          </div>
+        </div>
+
+        <div x-show="stackStatus.state==='up'" class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <h2 class="text-sm font-medium text-gray-400 mb-3">Quick Links</h2>
+          <div class="flex gap-6">
+            <a :href="'http://localhost:'+stackConfig.grafana_port" target="_blank" class="text-sm text-orange-400 hover:text-orange-300 transition-colors">Grafana :<span x-text="stackConfig.grafana_port"></span></a>
+            <a :href="'http://localhost:'+stackConfig.prometheus_port" target="_blank" class="text-sm text-orange-400 hover:text-orange-300 transition-colors">Prometheus :<span x-text="stackConfig.prometheus_port"></span></a>
+            <a :href="'http://localhost:'+stackConfig.loki_port" target="_blank" class="text-sm text-orange-400 hover:text-orange-300 transition-colors">Loki :<span x-text="stackConfig.loki_port"></span></a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stack Config -->
+      <div x-show="view==='stack-config'" class="p-8">
+        <h1 class="text-2xl font-bold mb-6">Stack Configuration</h1>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-lg">
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Grafana Port</label>
+              <input type="number" x-model="stackConfig.grafana_port" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Prometheus Port</label>
+              <input type="number" x-model="stackConfig.prometheus_port" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Loki Port</label>
+              <input type="number" x-model="stackConfig.loki_port" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Data Directory</label>
+              <input type="text" x-model="stackConfig.data_dir" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+            </div>
+          </div>
+          <button @click="saveStackConfig()" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Save</button>
+        </div>
+      </div>
+
+      <!-- Deploy Log -->
+      <div x-show="view==='stack-logs'" class="p-8">
+        <h1 class="text-2xl font-bold mb-6">Deploy Log</h1>
+        <div class="bg-gray-950 border border-gray-800 rounded-xl">
+          <div class="flex items-center justify-between px-5 py-3 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">stdout / stderr</span>
+            <button @click="stackLog=[]" class="text-xs text-gray-600 hover:text-gray-400 transition-colors">Clear</button>
+          </div>
+          <div id="logbox" class="p-5 space-y-0.5 max-h-[600px] overflow-auto">
+            <template x-for="(line,i) in stackLog" :key="i">
+              <div class="log-line" :class="line.startsWith('ERROR')?'text-red-400':line.startsWith('[ok]')?'text-green-400':'text-gray-300'" x-text="line"></div>
+            </template>
+            <div x-show="stackLog.length===0" class="log-line text-gray-600">No deploy output yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Target List -->
+      <div x-show="view==='targets'" class="p-8">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-2xl font-bold">Target Servers</h1>
+            <p class="text-sm text-gray-500 mt-1">Remote servers monitored by this stack. Adding a target auto-reloads Prometheus.</p>
+          </div>
+          <button @click="showAddTarget=true" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Target
+          </button>
+        </div>
+
+        <div class="space-y-3" x-show="targets.length>0">
+          <template x-for="t in targets" :key="t.id">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 flex items-center gap-4">
+              <div class="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium" x-text="t.name"></div>
+                <div class="text-sm text-gray-500" x-text="t.host"></div>
+                <div class="flex gap-1.5 mt-1.5 flex-wrap">
+                  <template x-for="a in t.agents" :key="a">
+                    <span class="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full" x-text="agentLabel(a)"></span>
+                  </template>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button @click="openTargetDetail(t)" class="text-sm bg-gray-800 hover:bg-gray-700 text-white px-3 py-1.5 rounded-lg transition-colors">Setup Script</button>
+                <button @click="deleteTarget(t.id)" class="text-gray-600 hover:text-red-400 transition-colors p-1.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div x-show="targets.length===0" class="text-center py-20">
+          <div class="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/></svg>
+          </div>
+          <h3 class="text-lg font-medium text-gray-400 mb-2">No target servers yet</h3>
+          <p class="text-sm text-gray-600 mb-6">Add a remote server and generate an agent install script for it.</p>
+          <button @click="showAddTarget=true" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors">Add first target</button>
+        </div>
+      </div>
+
+      <!-- Target Detail / Script -->
+      <div x-show="view==='target-detail'" class="p-8">
+        <div class="flex items-center gap-3 mb-6">
+          <button @click="view='targets'" class="text-gray-500 hover:text-white transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <div>
+            <h1 class="text-2xl font-bold" x-text="selectedTarget&&selectedTarget.name"></h1>
+            <p class="text-sm text-gray-500" x-text="selectedTarget&&selectedTarget.host"></p>
+          </div>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+          <h2 class="text-sm font-medium text-gray-400 mb-3">Agents</h2>
+          <div class="flex gap-2 flex-wrap">
+            <template x-for="a in selectedTarget&&selectedTarget.agents||[]" :key="a">
+              <span class="bg-orange-900/40 text-orange-300 text-sm px-3 py-1 rounded-full border border-orange-900/60" x-text="agentLabel(a)"></span>
+            </template>
+          </div>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+          <h2 class="text-sm font-medium text-gray-400 mb-1">curl One-Liner</h2>
+          <p class="text-xs text-gray-600 mb-3">Auf dem Zielserver ausführen — installiert Docker (wenn nötig) und alle Agents.</p>
+          <div class="flex items-center gap-3 bg-gray-950 border border-gray-800 rounded-lg px-4 py-3">
+            <code class="flex-1 text-sm text-green-400 font-mono break-all" x-text="scriptData.one_liner||'Wird geladen…'"></code>
+            <button @click="copyText(scriptData.one_liner)" title="Copy" class="text-gray-500 hover:text-white transition-colors shrink-0">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex gap-3 mb-5">
+          <a :href="selectedTarget?'/api/targets/'+selectedTarget.id+'/script?raw=1':'#'" download
+            class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Download oms-agent-setup.sh
+          </a>
+        </div>
+
+        <div class="bg-gray-950 border border-gray-800 rounded-xl">
+          <div class="flex items-center justify-between px-5 py-3 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">oms-agent-setup.sh</span>
+            <button @click="copyText(scriptData.script)" class="text-xs text-gray-500 hover:text-white transition-colors">Copy all</button>
+          </div>
+          <pre class="p-5 text-xs text-gray-300 font-mono overflow-auto max-h-[500px] whitespace-pre-wrap" x-text="scriptData.script||'Loading…'"></pre>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Add Target Modal -->
+  <div x-show="showAddTarget" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" @click.self="showAddTarget=false; addStep=1">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-lg">
+
+      <!-- Step indicator -->
+      <div class="flex items-center gap-2 mb-5">
+        <div :class="addStep>=1?'bg-orange-500 text-white':'bg-gray-800 text-gray-500'" class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">1</div>
+        <div class="flex-1 h-px" :class="addStep>=2?'bg-orange-500':'bg-gray-700'"></div>
+        <div :class="addStep>=2?'bg-orange-500 text-white':'bg-gray-800 text-gray-500'" class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">2</div>
+        <span class="text-xs text-gray-500 ml-2" x-text="addStep===1?'Server Info':'Choose Agents'"></span>
+      </div>
+
+      <!-- Step 1: Basic info -->
+      <div x-show="addStep===1" class="space-y-4">
+        <h2 class="font-semibold">Server Info</h2>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Server Name</label>
+          <input type="text" x-model="newTarget.name" placeholder="Production DB" autofocus
+            @keydown.enter="newTarget.name&&newTarget.host&&(addStep=2,prefillAgents())"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">IP Address / Hostname</label>
+          <input type="text" x-model="newTarget.host" placeholder="192.168.1.100"
+            @keydown.enter="newTarget.name&&newTarget.host&&(addStep=2,prefillAgents())"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div class="flex gap-3 pt-1">
+          <button @click="addStep=2; prefillAgents()"
+            :disabled="!newTarget.name||!newTarget.host"
+            :class="(!newTarget.name||!newTarget.host)?'opacity-40 cursor-not-allowed':'hover:bg-orange-600'"
+            class="flex-1 bg-orange-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
+            Next: Choose Agents →
+          </button>
+          <button @click="showAddTarget=false; addStep=1" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Agent selection -->
+      <div x-show="addStep===2" class="space-y-4">
+        <h2 class="font-semibold">Choose Agents</h2>
+        <p class="text-sm text-gray-500">Select which agents to install on <strong class="text-white" x-text="newTarget.name"></strong>:</p>
+
+        <div class="space-y-2">
+          <template x-for="agent in agentCatalog" :key="agent.type">
+            <label class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all"
+              :class="newTarget.agents.includes(agent.type)?'border-orange-500 bg-orange-500/10':'border-gray-700 hover:border-gray-600'">
+              <input type="checkbox" :value="agent.type" x-model="newTarget.agents" class="mt-0.5 accent-orange-500"/>
+              <div class="flex-1">
+                <div class="flex items-center gap-2 mb-0.5">
+                  <span class="text-sm font-medium" x-text="agent.name"></span>
+                  <span x-show="agent.recommended" class="text-xs bg-green-900 text-green-300 px-1.5 py-0.5 rounded">Recommended</span>
+                </div>
+                <div class="text-xs text-gray-500" x-text="agent.description"></div>
+                <div class="text-xs text-gray-600 mt-0.5">Port <span x-text="agent.port"></span></div>
+              </div>
+            </label>
+          </template>
+        </div>
+
+        <div class="flex gap-3 pt-1">
+          <button @click="addTarget()"
+            :disabled="newTarget.agents.length===0"
+            :class="newTarget.agents.length===0?'opacity-40 cursor-not-allowed':'hover:bg-orange-600'"
+            class="flex-1 bg-orange-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
+            Add Target
+          </button>
+          <button @click="addStep=1" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">← Back</button>
+          <button @click="showAddTarget=false; addStep=1" class="text-gray-500 hover:text-white px-4 py-2.5 rounded-lg text-sm transition-colors">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function app() {
+      return {
+        view: 'stack',
+        stackStatus: { state: '', services: [], log: [] },
+        stackConfig: { grafana_port: 3000, prometheus_port: 9090, loki_port: 3100, data_dir: '/opt/open-mon-stack' },
+        stackLog: [],
+        stackDeploying: false,
+        targets: [],
+        selectedTarget: null,
+        scriptData: {},
+        showAddTarget: false,
+        addStep: 1,
+        newTarget: { name: '', host: '', agents: [] },
+        agentCatalog: [],
+
+        async init() {
+          await Promise.all([this.loadStackStatus(), this.loadStackConfig(), this.loadTargets(), this.loadAgentCatalog()]);
+        },
+
+        async loadStackStatus() {
+          const res = await fetch('/api/stack/status');
+          const data = await res.json();
+          this.stackStatus = data;
+          this.stackLog = data.log || [];
+        },
+
+        async loadStackConfig() {
+          const res = await fetch('/api/stack/config');
+          this.stackConfig = await res.json();
+        },
+
+        async saveStackConfig() {
+          const res = await fetch('/api/stack/config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              grafana_port: parseInt(this.stackConfig.grafana_port),
+              prometheus_port: parseInt(this.stackConfig.prometheus_port),
+              loki_port: parseInt(this.stackConfig.loki_port),
+              data_dir: this.stackConfig.data_dir
+            })
+          });
+          if (res.ok) this.stackConfig = await res.json();
+        },
+
+        async deployStack() {
+          if (this.stackDeploying) return;
+          this.stackDeploying = true;
+          this.stackLog = ['Starting deployment…'];
+          this.view = 'stack-logs';
+
+          const res = await fetch('/api/stack/deploy', { method: 'POST' });
+          if (!res.ok) { this.stackDeploying = false; return; }
+
+          const es = new EventSource('/api/stack/logs');
+          es.onmessage = (e) => {
+            this.stackLog.push(e.data);
+            const el = document.getElementById('logbox');
+            if (el) el.scrollTop = el.scrollHeight;
+          };
+          es.addEventListener('done', () => {
+            es.close();
+            this.stackDeploying = false;
+            this.loadStackStatus();
+          });
+          es.onerror = () => { es.close(); this.stackDeploying = false; };
+        },
+
+        async stopStack() {
+          await fetch('/api/stack/stop', { method: 'POST' });
+          await this.loadStackStatus();
+        },
+
+        async loadTargets() {
+          const res = await fetch('/api/targets');
+          this.targets = await res.json();
+        },
+
+        async loadAgentCatalog() {
+          const res = await fetch('/api/agents');
+          this.agentCatalog = await res.json();
+        },
+
+        prefillAgents() {
+          this.newTarget.agents = this.agentCatalog.filter(a => a.recommended).map(a => a.type);
+        },
+
+        async addTarget() {
+          const res = await fetch('/api/targets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.newTarget)
+          });
+          if (res.ok) {
+            await this.loadTargets();
+            this.showAddTarget = false;
+            this.addStep = 1;
+            this.newTarget = { name: '', host: '', agents: [] };
+          }
+        },
+
+        async deleteTarget(id) {
+          if (!confirm('Remove this target? Prometheus will stop scraping it.')) return;
+          await fetch('/api/targets/' + id, { method: 'DELETE' });
+          if (this.selectedTarget && this.selectedTarget.id === id) {
+            this.selectedTarget = null;
+            this.view = 'targets';
+          }
+          await this.loadTargets();
+        },
+
+        async openTargetDetail(t) {
+          this.selectedTarget = t;
+          this.scriptData = {};
+          this.view = 'target-detail';
+          const res = await fetch('/api/targets/' + t.id + '/script');
+          if (res.ok) this.scriptData = await res.json();
+        },
+
+        agentLabel(type) {
+          const a = this.agentCatalog.find(x => x.type === type);
+          return a ? a.name : type;
+        },
+
+        async copyText(text) {
+          if (!text) return;
+          try { await navigator.clipboard.writeText(text); }
+          catch {
+            const el = document.createElement('textarea');
+            el.value = text;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>

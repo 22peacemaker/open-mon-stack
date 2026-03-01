@@ -1,0 +1,98 @@
+version: 2
+
+project_name: open-mon-stack
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: open-mon-stack
+    binary: open-mon-stack
+    main: .
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "Merge pull request"
+      - "Merge branch"
+  groups:
+    - title: "New Features"
+      regexp: "^.*feat[(\\w)]*:.*$"
+      order: 0
+    - title: "Bug Fixes"
+      regexp: "^.*fix[(\\w)]*:.*$"
+      order: 1
+    - title: "Other Changes"
+      order: 999
+
+release:
+  github:
+    owner: open-mon-stack
+    name: open-mon-stack
+  draft: true
+  prerelease: auto
+  name_template: "v{{.Version}}"
+
+nfpms:
+  - id: packages
+    package_name: open-mon-stack
+    vendor: Open Mon Stack
+    homepage: https://github.com/open-mon-stack/open-mon-stack
+    description: "One-click Prometheus, Grafana & Loki monitoring stack manager"
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/local/bin
+    contents:
+      - src: ./systemd/open-mon-stack.service
+        dst: /etc/systemd/system/open-mon-stack.service
+        type: config|noreplace
+
+brews:
+  - name: open-mon-stack
+    homepage: https://github.com/open-mon-stack/open-mon-stack
+    description: "One-click Prometheus, Grafana & Loki monitoring stack manager"
+    directory: Formula
+    repository:
+      owner: open-mon-stack
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    install: |
+      bin.install "open-mon-stack"
+    test: |
+      system "#{bin}/open-mon-stack", "--help"

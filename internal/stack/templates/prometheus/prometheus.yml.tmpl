@@ -1,0 +1,30 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "oms-node"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          instance: "monitoring-server"
+{{range .Targets}}{{if .HasNodeExporter}}
+  - job_name: "{{.ID}}-node"
+    static_configs:
+      - targets: ["{{.Host}}:9100"]
+        labels:
+          instance: "{{.Name}}"
+          target_id: "{{.ID}}"
+{{range $k, $v := .Labels}}          {{$k}}: "{{$v}}"
+{{end}}{{end}}{{if .HasCAdvisor}}
+  - job_name: "{{.ID}}-cadvisor"
+    static_configs:
+      - targets: ["{{.Host}}:8080"]
+        labels:
+          instance: "{{.Name}}"
+          target_id: "{{.ID}}"
+{{end}}{{end}}
