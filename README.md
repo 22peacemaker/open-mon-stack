@@ -1,7 +1,7 @@
 # open-mon-stack
 
-[![CI](https://github.com/open-mon-stack/open-mon-stack/actions/workflows/ci.yml/badge.svg)](https://github.com/open-mon-stack/open-mon-stack/actions/workflows/ci.yml)
-[![Release](https://github.com/open-mon-stack/open-mon-stack/releases/latest/badge.svg)](https://github.com/open-mon-stack/open-mon-stack/releases/latest)
+[![CI](https://github.com/22peacemaker/open-mon-stack/actions/workflows/ci.yml/badge.svg)](https://github.com/22peacemaker/open-mon-stack/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/22peacemaker/open-mon-stack)](https://github.com/22peacemaker/open-mon-stack/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A single-binary monitoring stack manager. Deploy Prometheus, Grafana, and Loki on any Linux server in seconds — then monitor remote servers by running one command on each.
@@ -28,17 +28,12 @@ open-mon-stack manages the central stack via Docker Compose and generates ready-
 
 ## Installation
 
-**Homebrew (macOS/Linux):**
-```bash
-brew install open-mon-stack/tap/open-mon-stack
-```
+Download the binary for your platform from the [releases page](https://github.com/22peacemaker/open-mon-stack/releases), or build from source:
 
-**DEB/RPM packages:** Download from the [releases page](https://github.com/open-mon-stack/open-mon-stack/releases).
-
-**Binary:**
 ```bash
-curl -L https://github.com/open-mon-stack/open-mon-stack/releases/latest/download/open-mon-stack_linux_amd64.tar.gz | tar xz
-sudo mv open-mon-stack /usr/local/bin/
+git clone https://github.com/22peacemaker/open-mon-stack.git
+cd open-mon-stack
+go build -o open-mon-stack .
 ```
 
 ## Usage
