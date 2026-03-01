@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/open-mon-stack/open-mon-stack/internal/deploy"
-	"github.com/open-mon-stack/open-mon-stack/internal/models"
+	"github.com/22peacemaker/open-mon-stack/internal/deploy"
+	"github.com/22peacemaker/open-mon-stack/internal/models"
 )
 
 func target(agents ...models.AgentType) *models.Target {

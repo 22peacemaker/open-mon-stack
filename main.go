@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/open-mon-stack/open-mon-stack/internal/api"
-	"github.com/open-mon-stack/open-mon-stack/internal/storage"
+	"github.com/22peacemaker/open-mon-stack/internal/api"
+	"github.com/22peacemaker/open-mon-stack/internal/storage"
 )
 
 // Set by goreleaser via -ldflags

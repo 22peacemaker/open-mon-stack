@@ -8,8 +8,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
-	"github.com/open-mon-stack/open-mon-stack/internal/api/handlers"
-	"github.com/open-mon-stack/open-mon-stack/internal/storage"
+	"github.com/22peacemaker/open-mon-stack/internal/api/handlers"
+	"github.com/22peacemaker/open-mon-stack/internal/storage"
 )
 
 type Server struct {

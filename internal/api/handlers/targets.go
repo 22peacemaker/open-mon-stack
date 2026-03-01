@@ -6,9 +6,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/open-mon-stack/open-mon-stack/internal/deploy"
-	"github.com/open-mon-stack/open-mon-stack/internal/models"
-	"github.com/open-mon-stack/open-mon-stack/internal/storage"
+	"github.com/22peacemaker/open-mon-stack/internal/deploy"
+	"github.com/22peacemaker/open-mon-stack/internal/models"
+	"github.com/22peacemaker/open-mon-stack/internal/storage"
 )
 
 type TargetHandler struct {

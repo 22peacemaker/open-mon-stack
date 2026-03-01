@@ -6,7 +6,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/open-mon-stack/open-mon-stack/internal/models"
+	"github.com/22peacemaker/open-mon-stack/internal/models"
 )
 
 const agentScriptTemplate = `#!/usr/bin/env bash

@@ -1,4 +1,4 @@
-module github.com/open-mon-stack/open-mon-stack
+module github.com/22peacemaker/open-mon-stack
 
 go 1.25.4
 

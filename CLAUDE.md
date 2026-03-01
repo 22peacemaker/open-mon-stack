@@ -17,8 +17,8 @@ go test ./...
 # Test single package
 go test ./internal/deploy/...
 
-# Release (requires goreleaser + git tag)
-goreleaser release
+# Release (push a tag — GitHub Actions runs goreleaser)
+git tag v0.1.0 && git push origin v0.1.0
 ```
 
 ## Architecture

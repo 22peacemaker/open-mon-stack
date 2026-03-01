@@ -71,7 +71,7 @@ nfpms:
   - id: packages
     package_name: open-mon-stack
     vendor: Open Mon Stack
-    homepage: https://github.com/open-mon-stack/open-mon-stack
+    homepage: https://github.com/22peacemaker/open-mon-stack
     description: "One-click Prometheus, Grafana & Loki monitoring stack manager"
     license: MIT
     formats:
@@ -85,7 +85,7 @@ nfpms:
 
 brews:
   - name: open-mon-stack
-    homepage: https://github.com/open-mon-stack/open-mon-stack
+    homepage: https://github.com/22peacemaker/open-mon-stack
     description: "One-click Prometheus, Grafana & Loki monitoring stack manager"
     directory: Formula
     repository:

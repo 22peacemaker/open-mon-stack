@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/open-mon-stack/open-mon-stack/internal/models"
-	"github.com/open-mon-stack/open-mon-stack/internal/stack"
+	"github.com/22peacemaker/open-mon-stack/internal/models"
+	"github.com/22peacemaker/open-mon-stack/internal/stack"
 )
 
 func defaultCfg() models.StackConfig {

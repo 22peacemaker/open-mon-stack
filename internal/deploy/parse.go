@@ -3,7 +3,7 @@ package deploy
 import (
 	"encoding/json"
 
-	"github.com/open-mon-stack/open-mon-stack/internal/models"
+	"github.com/22peacemaker/open-mon-stack/internal/models"
 )
 
 // composePSEntry matches the JSON output of `docker compose ps --format json`

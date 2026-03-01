@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/open-mon-stack/open-mon-stack/internal/models"
+	"github.com/22peacemaker/open-mon-stack/internal/models"
 )
 
 type Store struct {

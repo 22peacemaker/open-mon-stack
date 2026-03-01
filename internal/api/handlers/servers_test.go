@@ -9,9 +9,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/open-mon-stack/open-mon-stack/internal/api/handlers"
-	"github.com/open-mon-stack/open-mon-stack/internal/models"
-	"github.com/open-mon-stack/open-mon-stack/internal/storage"
+	"github.com/22peacemaker/open-mon-stack/internal/api/handlers"
+	"github.com/22peacemaker/open-mon-stack/internal/models"
+	"github.com/22peacemaker/open-mon-stack/internal/storage"
 )
 
 func newEcho() *echo.Echo {
