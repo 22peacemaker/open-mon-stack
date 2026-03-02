@@ -163,12 +163,12 @@ func (h *StackHandler) StreamLogs(c echo.Context) error {
 	for {
 		st := h.store.GetStackStatus()
 		for sent < len(st.Log) {
-			fmt.Fprintf(c.Response(), "data: %s\n\n", st.Log[sent])
+			_, _ = fmt.Fprintf(c.Response(), "data: %s\n\n", st.Log[sent])
 			c.Response().Flush()
 			sent++
 		}
 		if st.State == models.StackStateUp || st.State == models.StackStateFailed {
-			fmt.Fprintf(c.Response(), "event: done\ndata: %s\n\n", st.State)
+			_, _ = fmt.Fprintf(c.Response(), "event: done\ndata: %s\n\n", st.State)
 			c.Response().Flush()
 			return nil
 		}

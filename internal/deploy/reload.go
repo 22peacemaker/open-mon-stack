@@ -16,7 +16,7 @@ func ReloadPrometheus(prometheusPort int) error {
 	if err != nil {
 		return fmt.Errorf("reload request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("prometheus reload returned %d", resp.StatusCode)
@@ -33,7 +33,7 @@ func ReloadAlertmanager(alertmanagerPort int) error {
 	if err != nil {
 		return fmt.Errorf("alertmanager reload request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("alertmanager reload returned %d", resp.StatusCode)
