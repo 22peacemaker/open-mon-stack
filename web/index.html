@@ -127,8 +127,15 @@
           <button @click="view='alert-events'; loadAlertEvents()" :class="view==='alert-events'?'text-orange-400':'text-gray-500 hover:text-gray-300'" class="w-full text-left text-xs px-3 py-1.5 rounded transition-colors">↳ History</button>
         </div>
 
+        <button @click="view='logs'; loadLogs()"
+          :class="view==='logs' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'"
+          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Logs
+        </button>
+
         <!-- Users (admin only) -->
-        <button x-show="currentUser && currentUser.role === 'admin'" @click="view='users'; loadUsers()"
+        <button x-show="currentUser && currentUser.role === 'admin'" @click="view='users'; loadUsers(); loadTokens()"
           :class="view==='users' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'"
           class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left">
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
@@ -472,6 +479,80 @@
         </div>
       </div>
 
+      <!-- Logs (Loki viewer) -->
+      <div x-show="view==='logs'" class="p-8" x-effect="(function(){ if (view==='logs' && logsAutoRefresh) { if (!logsRefreshInterval) logsRefreshInterval = setInterval(() => loadLogs(), 10000); } else if (logsRefreshInterval) { clearInterval(logsRefreshInterval); logsRefreshInterval = null; } })()">
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-2xl font-bold">Logs</h1>
+          <div class="flex items-center gap-3">
+            <label class="flex items-center gap-2 text-sm text-gray-400">
+              <input type="checkbox" x-model="logsAutoRefresh" class="rounded border-gray-600 bg-gray-800 text-orange-500 focus:ring-orange-500"/>
+              Auto-refresh (10s)
+            </label>
+            <button @click="loadLogs()" :disabled="logsLoading" class="text-gray-500 hover:text-white transition-colors p-2 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+              title="Refresh">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-end gap-4 mb-4">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Stream</label>
+            <select x-model="logsStream" @change="loadLogs()" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500 min-w-[200px]">
+              <option value="{job=\"varlogs\"}">System logs (varlogs)</option>
+              <option value="{job=\"docker\"}">Docker logs</option>
+              <template x-for="t in targets" :key="t.id">
+                <optgroup :label="t.name">
+                  <option :value="'{job=\"varlogs\",host=\"'+t.host+'\"}'" x-text="t.name + ' (varlogs)'"></option>
+                  <option :value="'{job=\"docker\",host=\"'+t.host+'\"}'" x-text="t.name + ' (docker)'"></option>
+                </optgroup>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Search</label>
+            <input type="text" x-model="logsSearch" @keydown.enter="loadLogs()" placeholder="Filter (LogQL |=)"
+              class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500 w-64"/>
+          </div>
+          <div class="flex gap-1">
+            <template x-for="r in [['15m',15],['1h',60],['6h',360],['24h',1440]]" :key="r[0]">
+              <button @click="logsTimeRange=r[0]; loadLogs()"
+                :class="logsTimeRange===r[0] ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'"
+                class="px-3 py-2 rounded-lg text-sm font-medium transition-colors" x-text="r[0]"></button>
+            </template>
+          </div>
+          <button @click="loadLogs()" :disabled="logsLoading"
+            class="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <span x-text="logsLoading ? 'Loading…' : 'Query'"></span>
+          </button>
+        </div>
+
+        <div x-show="logsError" class="mb-4 text-sm text-red-400" x-text="logsError"></div>
+        <div x-show="stackStatus.state !== 'up' && !logsError" class="mb-4 text-sm text-amber-400">Stack is not running. Start the stack to view logs.</div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <div class="overflow-x-auto max-h-[70vh]">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-gray-800/80 sticky top-0 z-10">
+                <tr>
+                  <th class="px-4 py-2.5 text-xs font-medium text-gray-500 uppercase w-40 shrink-0">Time</th>
+                  <th class="px-4 py-2.5 text-xs font-medium text-gray-500 uppercase">Log line</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(row, i) in logsResult" :key="i">
+                  <tr class="border-t border-gray-800 hover:bg-gray-800/50">
+                    <td class="px-4 py-1.5 text-gray-500 whitespace-nowrap log-line" x-text="row.ts ? new Date(Number(row.ts)/1e6).toLocaleString() : ''"></td>
+                    <td class="px-4 py-1.5 log-line break-all" x-text="row.line"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="logsResult.length === 0 && !logsLoading && !logsError && stackStatus.state === 'up'" class="px-4 py-8 text-center text-gray-500 text-sm">No log lines in the selected range.</div>
+        </div>
+      </div>
+
       <!-- Target Detail / Script -->
       <div x-show="view==='target-detail'" class="p-8">
         <div class="flex items-center gap-3 mb-6">
@@ -560,6 +641,36 @@
         </div>
 
         <div x-show="users.length === 0" class="text-center py-20 text-gray-600 text-sm">No users found.</div>
+
+        <!-- API Tokens -->
+        <div class="mt-10 pt-8 border-t border-gray-800">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-lg font-semibold">API Tokens</h2>
+              <p class="text-sm text-gray-500 mt-0.5">Tokens for programmatic access (CI/CD, curl). Use header <code class="text-gray-400">X-OMS-Token: &lt;token&gt;</code></p>
+            </div>
+            <button @click="showAddToken=true; newToken={name:'',role:'viewer',expires_at:null}; tokenError=''; createdTokenRaw=null" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Create token
+            </button>
+          </div>
+          <div class="space-y-3" x-show="tokens.length > 0">
+            <template x-for="t in tokens" :key="t.id">
+              <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center gap-4">
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium" x-text="t.name || '(no name)'"></div>
+                  <div class="flex items-center gap-2 mt-0.5">
+                    <span :class="t.role==='admin'?'bg-orange-900/50 text-orange-300':'bg-gray-700 text-gray-400'" class="text-xs px-2 py-0.5 rounded-full capitalize" x-text="t.role"></span>
+                    <span class="text-xs text-gray-500" x-show="t.expires_at" x-text="'Expires ' + (t.expires_at ? new Date(t.expires_at).toLocaleDateString() : '')"></span>
+                    <span class="text-xs text-gray-500" x-show="!t.expires_at">No expiry</span>
+                  </div>
+                </div>
+                <button @click="revokeToken(t.id)" class="text-sm text-gray-500 hover:text-red-400 transition-colors">Revoke</button>
+              </div>
+            </template>
+          </div>
+          <div x-show="tokens.length === 0" class="text-center py-8 text-gray-600 text-sm">No API tokens. Create one for CI/CD or scripts.</div>
+        </div>
       </div>
 
     </main>
@@ -623,6 +734,51 @@
           <button @click="showEditUser=false; userError=''" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Cancel</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Create API Token Modal -->
+  <div x-show="showAddToken" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" @click.self="showAddToken=false; createdTokenRaw=null">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md">
+      <template x-if="!createdTokenRaw">
+        <div>
+          <h2 class="font-semibold mb-4">Create API Token</h2>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Name (optional)</label>
+              <input type="text" x-model="newToken.name" placeholder="e.g. CI pipeline" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Role</label>
+              <select x-model="newToken.role" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500">
+                <option value="viewer">Viewer (read-only)</option>
+                <option value="admin">Admin (full access)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Expires (optional)</label>
+              <input type="datetime-local" x-model="newToken.expires_at" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+              <p class="text-xs text-gray-600 mt-1">Leave empty for no expiry.</p>
+            </div>
+            <div x-show="tokenError" class="text-xs text-red-400" x-text="tokenError"></div>
+            <div class="flex gap-3 pt-1">
+              <button @click="createToken()" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Create token</button>
+              <button @click="showAddToken=false; tokenError=''" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template x-if="createdTokenRaw">
+        <div>
+          <h2 class="font-semibold mb-2">Token created</h2>
+          <p class="text-xs text-amber-400 mb-3">Copy this token now. It will not be shown again.</p>
+          <div class="flex gap-2 mb-4">
+            <input type="text" :value="createdTokenRaw" readonly class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono text-gray-300"/>
+            <button @click="copyToken(createdTokenRaw)" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0">Copy</button>
+          </div>
+          <button @click="showAddToken=false; createdTokenRaw=null; loadTokens()" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Done</button>
+        </div>
+      </template>
     </div>
   </div>
 
@@ -864,6 +1020,23 @@
         editingUser: null,
         editUserForm: { password: '', role: 'viewer' },
         userError: '',
+        // API Tokens
+        tokens: [],
+        showAddToken: false,
+        newToken: { name: '', role: 'viewer', expires_at: null },
+        createdTokenRaw: null,
+        tokenError: '',
+
+        // Logs (Loki viewer)
+        logsStream: '{job="varlogs"}',
+        logsSearch: '',
+        logsTimeRange: '1h',
+        logsLimit: 100,
+        logsAutoRefresh: false,
+        logsResult: [],
+        logsLoading: false,
+        logsError: '',
+        logsRefreshInterval: null,
 
         async init() {
           const res = await fetch('/api/auth/me');
@@ -1040,6 +1213,62 @@
           return a ? a.name : type;
         },
 
+        // ── Logs (Loki) ───────────────────────────────────────────────────────
+
+        logsTimeRangeNs() {
+          const m = { '15m': 15, '1h': 60, '6h': 360, '24h': 1440 }[this.logsTimeRange] || 60;
+          return m * 60 * 1e9; // minutes to nanoseconds
+        },
+
+        async loadLogs() {
+          this.logsError = '';
+          this.logsLoading = true;
+          const endNs = Math.floor(Date.now() * 1e6);
+          const startNs = endNs - (this.logsTimeRangeNs() || 3600 * 1e9);
+          let query = this.logsStream;
+          const search = (this.logsSearch || '').trim();
+          if (search) {
+            const escaped = search.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            query = query + ' |= "' + escaped + '"';
+          }
+          const params = new URLSearchParams({
+            query: query,
+            limit: String(this.logsLimit),
+            start: String(startNs),
+            end: String(endNs),
+            direction: 'backward'
+          });
+          try {
+            const res = await fetch('/api/logs/query?' + params.toString());
+            if (res.status === 503) {
+              this.logsError = 'Stack is not running.';
+              this.logsResult = [];
+              return;
+            }
+            if (!res.ok) {
+              const t = await res.text();
+              this.logsError = t || 'Query failed';
+              this.logsResult = [];
+              return;
+            }
+            const data = await res.json();
+            const result = (data.data && data.data.result) || [];
+            const rows = [];
+            for (const stream of result) {
+              const values = stream.values || [];
+              for (const [ts, line] of values)
+                rows.push({ ts: ts, line: line || '' });
+            }
+            rows.sort((a, b) => Number(b.ts) - Number(a.ts));
+            this.logsResult = rows;
+          } catch (e) {
+            this.logsError = e.message || 'Request failed';
+            this.logsResult = [];
+          } finally {
+            this.logsLoading = false;
+          }
+        },
+
         // ── Channels ──────────────────────────────────────────────────────────
 
         async loadChannels() {
@@ -1191,6 +1420,48 @@
             const d = await res.json().catch(() => ({}));
             alert(d.message || 'Failed to delete user');
           }
+        },
+
+        // ── API Tokens ────────────────────────────────────────────────────────
+
+        async loadTokens() {
+          const res = await fetch('/api/tokens');
+          if (res.ok) this.tokens = await res.json();
+        },
+
+        async createToken() {
+          this.tokenError = '';
+          const body = { name: this.newToken.name, role: this.newToken.role };
+          if (this.newToken.expires_at) body.expires_at = new Date(this.newToken.expires_at).toISOString();
+          const res = await fetch('/api/tokens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          if (res.ok) {
+            const data = await res.json();
+            this.createdTokenRaw = data.token;
+          } else {
+            const d = await res.json().catch(() => ({}));
+            this.tokenError = d.message || 'Failed to create token';
+          }
+        },
+
+        async revokeToken(id) {
+          if (!confirm('Revoke this token? It will stop working immediately.')) return;
+          const res = await fetch('/api/tokens/' + id, { method: 'DELETE' });
+          if (res.ok) await this.loadTokens();
+        },
+
+        copyToken(token) {
+          navigator.clipboard.writeText(token).then(() => {}).catch(() => {
+            const el = document.createElement('textarea');
+            el.value = token;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+          });
         }
       };
     }

@@ -104,6 +104,7 @@ func (s *Server) setupRoutes(webFS embed.FS) {
 	e.GET("/", s.serveIndex(webFS))
 	e.GET("/targets/*", s.serveIndex(webFS))
 	e.GET("/alerts/*", s.serveIndex(webFS))
+	e.GET("/logs/*", s.serveIndex(webFS))
 
 	// ── Public endpoints ──────────────────────────────────────────────────────
 
@@ -157,6 +158,10 @@ func (s *Server) setupRoutes(webFS embed.FS) {
 	api.GET("/alerts/rules/:id", alh.Get)
 	api.GET("/alerts/events", alh.ListEvents)
 
+	// Loki log viewer (reads; requires stack up, handler returns 503 otherwise)
+	lh := handlers.NewLogsHandler(s.store)
+	api.GET("/logs/query", lh.Query)
+
 	// ── Admin-only writes ─────────────────────────────────────────────────────
 
 	adm := e.Group("/api", requireAdmin)
@@ -189,6 +194,12 @@ func (s *Server) setupRoutes(webFS embed.FS) {
 	adm.GET("/users/:id", uh.Get)
 	adm.PUT("/users/:id", uh.Update)
 	adm.DELETE("/users/:id", uh.Delete)
+
+	// API tokens (admin only)
+	tokH := handlers.NewTokenHandler(s.store)
+	adm.GET("/tokens", tokH.List)
+	adm.POST("/tokens", tokH.Create)
+	adm.DELETE("/tokens/:id", tokH.Delete)
 }
 
 func (s *Server) serveIndex(webFS embed.FS) echo.HandlerFunc {

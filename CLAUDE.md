@@ -80,18 +80,26 @@ GET/PUT  /api/alerts/rules/:id                                              [PUT
 DELETE   /api/alerts/rules/:id     Cannot delete preset rules              [admin]
 GET      /api/alerts/events        In-memory alert event log (last 100)
 
+GET      /api/logs/query            Loki log query proxy (query, limit, start, end); 503 if stack not up [viewer+]
+
 GET/POST /api/users                User management                          [admin]
 GET/PUT  /api/users/:id                                                     [admin]
 DELETE   /api/users/:id                                                     [admin]
+
+GET/POST /api/tokens               API tokens (programmatic access)        [admin]
+DELETE  /api/tokens/:id            Revoke token                             [admin]
 ```
+
+Auth for protected routes: session cookie `oms_session` **or** header `X-OMS-Token: <token>`. Token format: `oms_<id>_<secret>`; raw value returned only once on `POST /api/tokens`.
 
 ## Key Implementation Details
 
 - **Embedded assets**: Templates embedded with `//go:embed` in `internal/stack/generator.go`; frontend embedded in `internal/api/server.go`
 - **StackStatus is in-memory only** — not persisted to `data.json`; resets on restart
-- **Authentication**: Session-cookie auth (`oms_session`, HttpOnly, 24h TTL). Sessions are in-memory only — lost on restart. Roles: `admin` (full write access) and `viewer` (read-only). First-run: visit `/api/setup/status`; if `needs_setup` is true, `POST /api/setup` to create the first admin. Middleware: `internal/api/middleware/auth.go`; aliased as `authmw` in `server.go` to avoid conflict with Echo's middleware package.
+- **Authentication**: Session-cookie auth (`oms_session`, HttpOnly, 24h TTL) or API token via header `X-OMS-Token`. Tokens are stored in `data.json` (id, name, role, optional expiry, token hash); raw token value is returned only once on creation. Tokens are managed on the Users admin page. Sessions are in-memory only — lost on restart. Roles: `admin` (full write access) and `viewer` (read-only). First-run: visit `/api/setup/status`; if `needs_setup` is true, `POST /api/setup` to create the first admin. Middleware: `internal/api/middleware/auth.go`; aliased as `authmw` in `server.go` to avoid conflict with Echo's middleware package.
 - **Alertmanager**: Added to docker-compose stack (port `alertmanager_port` in `StackConfig`). OMS acts as the Alertmanager webhook receiver. Notification channels (Slack, Discord, ntfy, n8n, generic webhook) stored in `data.json`. Alert rules rendered to `internal/stack/templates/prometheus/alerts.yml.tmpl`; hot-reloaded via Prometheus `/-/reload`. Alert events are in-memory only (last 100).
 - **Preset alert rules**: 4 built-in rules (HostDown, HighCPU, HighDisk, HighMemory) seeded on first store init. Presets can be toggled (enabled/disabled) but not deleted or fully edited.
+- **Loki log viewer**: The **Logs** page in the UI lets viewers query Loki without opening Grafana. `GET /api/logs/query` proxies to the local Loki `query_range` API. The UI offers stream selector (e.g. `{job="varlogs"}`, `{job="docker"}`, or per-target with `host`), plain-text search (`|= "term"`), time range (15m/1h/6h/24h), and optional auto-refresh. Available only when the stack is up.
 - **Version info** injected at build time via goreleaser ldflags (`main.version`, `main.commit`, `main.date`)
 - **Goroutine safety**: deploy goroutine is guarded by a mutex in `handlers/stack.go`; cancel via context
 - Multi-platform builds: Linux (amd64/arm64), macOS (amd64/arm64), Windows (amd64) — packaged as DEB, RPM, and Homebrew tap

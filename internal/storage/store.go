@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/22peacemaker/open-mon-stack/internal/models"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const sessionTTL = 24 * time.Hour
@@ -26,6 +28,7 @@ type Store struct {
 	alertEvents []models.AlertEvent
 	users       map[string]*models.User
 	usernameIdx map[string]string  // username → user ID; O(1) lookup
+	tokens      map[string]*models.APIToken
 	sessions    map[string]*models.Session
 	sessionMu   sync.RWMutex
 }
@@ -44,6 +47,7 @@ func New(dataDir string) (*Store, error) {
 		alertEvents: []models.AlertEvent{},
 		users:       make(map[string]*models.User),
 		usernameIdx: make(map[string]string),
+		tokens:      make(map[string]*models.APIToken),
 		sessions:    make(map[string]*models.Session),
 	}
 	_ = s.load()
@@ -341,6 +345,73 @@ func (s *Store) AdminCount() int {
 	return count
 }
 
+// ── API Tokens ───────────────────────────────────────────────────────────────
+
+const tokenPrefix = "oms_"
+
+// AddToken persists an API token. The token's TokenHash must already be set.
+func (s *Store) AddToken(t *models.APIToken) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tokens[t.ID] = t
+	return s.save()
+}
+
+// GetToken returns a token by ID (does not check expiry).
+func (s *Store) GetToken(id string) (*models.APIToken, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	t, ok := s.tokens[id]
+	return t, ok
+}
+
+// ListTokens returns all API tokens.
+func (s *Store) ListTokens() []*models.APIToken {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]*models.APIToken, 0, len(s.tokens))
+	for _, t := range s.tokens {
+		result = append(result, t)
+	}
+	return result
+}
+
+// DeleteToken removes a token by ID.
+func (s *Store) DeleteToken(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.tokens, id)
+	return s.save()
+}
+
+// VerifyToken parses a raw token value (format "oms_<id>_<secret>"), loads the token by ID,
+// checks expiry, and verifies the secret against TokenHash. Returns the token and true if valid.
+func (s *Store) VerifyToken(raw string) (*models.APIToken, bool) {
+	if !strings.HasPrefix(raw, tokenPrefix) {
+		return nil, false
+	}
+	rest := strings.TrimPrefix(raw, tokenPrefix)
+	idx := strings.Index(rest, "_")
+	if idx <= 0 || idx >= len(rest)-1 {
+		return nil, false
+	}
+	id := rest[:idx]
+	secret := rest[idx+1:]
+	s.mu.RLock()
+	t, ok := s.tokens[id]
+	s.mu.RUnlock()
+	if !ok || t == nil {
+		return nil, false
+	}
+	if t.ExpiresAt != nil && time.Now().After(*t.ExpiresAt) {
+		return nil, false
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(t.TokenHash), []byte(secret)); err != nil {
+		return nil, false
+	}
+	return t, true
+}
+
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
 func (s *Store) CreateSession(userID, username string, role models.Role) *models.Session {
@@ -396,6 +467,7 @@ type persistData struct {
 	AlertRules  map[string]*models.AlertRule           `json:"alert_rules"`
 	AlertEvents []models.AlertEvent                    `json:"alert_events,omitempty"`
 	Users       map[string]*models.User                `json:"users"`
+	Tokens      map[string]*models.APIToken            `json:"tokens,omitempty"`
 	Sessions    map[string]*models.Session             `json:"sessions,omitempty"`
 }
 
@@ -420,6 +492,7 @@ func (s *Store) save() error {
 		AlertRules:  s.alertRules,
 		AlertEvents: s.alertEvents,
 		Users:       s.users,
+		Tokens:      s.tokens,
 		Sessions:    sessions,
 	}
 	b, err := json.MarshalIndent(data, "", "  ")
@@ -474,6 +547,9 @@ func (s *Store) load() error {
 		for _, u := range s.users {
 			s.usernameIdx[u.Username] = u.ID
 		}
+	}
+	if data.Tokens != nil {
+		s.tokens = data.Tokens
 	}
 	// Restore non-expired sessions
 	if data.Sessions != nil {

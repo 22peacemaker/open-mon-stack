@@ -20,10 +20,62 @@ set -euo pipefail
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 info()  { echo -e "${CYAN}[oms-agent]${NC} $*"; }
 ok()    { echo -e "${GREEN}[ok]${NC} $*"; }
+warn()  { echo -e "${YELLOW}[warn]${NC} $*"; }
 die()   { echo -e "${RED}[error]${NC} $*" >&2; exit 1; }
 
 LOKI_URL="{{.LokiURL}}"
 DATA_DIR="/opt/oms-agent"
+FETCH_CMD=""
+
+# ── Prerequisites: root/sudo ──────────────────────────────────
+ensure_root() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    return
+  fi
+  if command -v sudo &>/dev/null && [[ -f "$0" ]] && [[ "$0" != "bash" && "$0" != "sh" ]]; then
+    info "Re-running with sudo..."
+    exec sudo "$0" "$@"
+  fi
+  die "This script must be run as root or with sudo. Example: curl -fsSL … | sudo bash"
+}
+
+# ── Prerequisites: curl or wget ───────────────────────────────
+ensure_fetch_cmd() {
+  if command -v curl &>/dev/null; then
+    FETCH_CMD="curl -fsSL"
+    ok "Using curl for downloads"
+    return
+  fi
+  if command -v wget &>/dev/null; then
+    FETCH_CMD="wget -qO-"
+    ok "Using wget for downloads"
+    return
+  fi
+  info "Neither curl nor wget found, attempting to install curl..."
+  if [[ -f /etc/os-release ]]; then
+    # shellcheck source=/dev/null
+    . /etc/os-release
+    if command -v apt-get &>/dev/null; then
+      apt-get update -qq && apt-get install -y curl
+      FETCH_CMD="curl -fsSL"
+      ok "curl installed"
+      return
+    fi
+    if command -v dnf &>/dev/null; then
+      dnf install -y curl
+      FETCH_CMD="curl -fsSL"
+      ok "curl installed"
+      return
+    fi
+    if command -v yum &>/dev/null; then
+      yum install -y curl
+      FETCH_CMD="curl -fsSL"
+      ok "curl installed"
+      return
+    fi
+  fi
+  die "Could not find or install curl or wget. Please install curl and re-run."
+}
 
 # ── Docker ───────────────────────────────────────────────────
 install_docker() {
@@ -32,8 +84,59 @@ install_docker() {
     return
   fi
   info "Installing Docker..."
-  curl -fsSL https://get.docker.com | sh
+  $FETCH_CMD https://get.docker.com | sh
   ok "Docker installed"
+}
+
+# ── Prerequisites: Docker Compose V2 ──────────────────────────
+ensure_docker_compose() {
+  if docker compose version &>/dev/null; then
+    ok "Docker Compose V2 available"
+    return
+  fi
+  info "Docker Compose V2 not found, attempting to install plugin..."
+  if [[ -f /etc/os-release ]]; then
+    # shellcheck source=/dev/null
+    . /etc/os-release
+    if command -v apt-get &>/dev/null; then
+      apt-get update -qq && apt-get install -y docker-compose-plugin
+    elif command -v dnf &>/dev/null; then
+      dnf install -y docker-compose-plugin
+    elif command -v yum &>/dev/null; then
+      yum install -y docker-compose-plugin
+    else
+      die "Could not install docker-compose-plugin (unknown package manager). Please install Docker Compose V2 and re-run."
+    fi
+  else
+    die "Could not detect OS. Please install Docker Compose V2 and re-run."
+  fi
+  if docker compose version &>/dev/null; then
+    ok "Docker Compose V2 installed"
+  else
+    die "Docker Compose V2 is required. Install docker-compose-plugin and re-run."
+  fi
+}
+
+# ── Optional: port check (warn only) ──────────────────────────
+check_ports() {
+  local port_used
+  port_used() {
+    (command -v ss &>/dev/null && ss -tlnp 2>/dev/null | grep -q ":${1}[[:space:]]") || \
+    (command -v netstat &>/dev/null && netstat -tlnp 2>/dev/null | grep -q ":${1}[[:space:]]") || false
+  }
+{{if .HasNodeExporter}}  if port_used 9100; then warn "Port 9100 is already in use (Node Exporter)"; fi
+{{end}}{{if .HasPromtail}}  if port_used 9080; then warn "Port 9080 is already in use (Promtail)"; fi
+{{end}}{{if .HasCAdvisor}}  if port_used 8080; then warn "Port 8080 is already in use (cAdvisor)"; fi
+{{end}}
+}
+
+# ── Prerequisites: run all checks and installs ─────────────────
+ensure_prerequisites() {
+  ensure_root "$@"
+  ensure_fetch_cmd
+  install_docker
+  ensure_docker_compose
+  check_ports
 }
 
 # ── Directories ──────────────────────────────────────────────
@@ -166,7 +269,7 @@ main() {
   echo -e "  Agents: ${YELLOW}{{.AgentList}}${NC}"
   echo ""
 
-  install_docker
+  ensure_prerequisites "$@"
   create_dirs
 {{if .HasPromtail}}  write_promtail_config
 {{end}}  write_compose

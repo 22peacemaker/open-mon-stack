@@ -107,3 +107,56 @@ func TestAgentScriptNodeExporterOnlyNoPromtailConfig(t *testing.T) {
 		t.Error("should not write promtail config when promtail not selected")
 	}
 }
+
+func TestAgentScriptContainsRootOrSudoCheck(t *testing.T) {
+	s, _ := deploy.GenerateAgentScript(target(models.AgentNodeExporter), "http://mon:3100")
+	if !strings.Contains(s, "id -u") {
+		t.Error("script should check for root (id -u)")
+	}
+	if !strings.Contains(s, "sudo") {
+		t.Error("script should mention or use sudo for re-exec")
+	}
+}
+
+func TestAgentScriptContainsFetchCmdOrCurlWget(t *testing.T) {
+	s, _ := deploy.GenerateAgentScript(target(models.AgentNodeExporter), "http://mon:3100")
+	if !strings.Contains(s, "FETCH_CMD") {
+		t.Error("script should set or use FETCH_CMD for downloads")
+	}
+	if !strings.Contains(s, "curl") || !strings.Contains(s, "wget") {
+		t.Error("script should support curl and/or wget for downloads")
+	}
+}
+
+func TestAgentScriptContainsDockerComposeV2Check(t *testing.T) {
+	s, _ := deploy.GenerateAgentScript(target(models.AgentNodeExporter), "http://mon:3100")
+	if !strings.Contains(s, "docker compose version") {
+		t.Error("script should check for Docker Compose V2")
+	}
+	if !strings.Contains(s, "docker-compose-plugin") {
+		t.Error("script should install or reference docker-compose-plugin")
+	}
+}
+
+func TestAgentScriptMainCallsEnsurePrerequisites(t *testing.T) {
+	s, _ := deploy.GenerateAgentScript(target(models.AgentNodeExporter), "http://mon:3100")
+	if !strings.Contains(s, "ensure_prerequisites") {
+		t.Error("main should call ensure_prerequisites")
+	}
+}
+
+func TestAgentScriptPortCheckOnlyForSelectedAgents(t *testing.T) {
+	s, _ := deploy.GenerateAgentScript(target(models.AgentNodeExporter), "http://mon:3100")
+	if !strings.Contains(s, "9100") {
+		t.Error("script with node-exporter should reference port 9100")
+	}
+	sAll, _ := deploy.GenerateAgentScript(
+		target(models.AgentNodeExporter, models.AgentPromtail, models.AgentCAdvisor),
+		"http://mon:3100",
+	)
+	for _, port := range []string{"9100", "9080", "8080"} {
+		if !strings.Contains(sAll, port) {
+			t.Errorf("script with all agents should reference port %s", port)
+		}
+	}
+}
