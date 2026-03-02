@@ -15,7 +15,71 @@
 </head>
 <body class="h-full text-gray-100" x-data="app()" x-init="init()" x-cloak>
 
-  <div class="flex h-full">
+  <!-- Loading -->
+  <div x-show="!authChecked" class="flex h-full items-center justify-center bg-gray-950">
+    <div class="text-gray-500 text-sm">Loading…</div>
+  </div>
+
+  <!-- Login -->
+  <div x-show="authChecked && view === 'login'" class="flex h-full items-center justify-center bg-gray-950">
+    <div class="w-full max-w-sm">
+      <div class="text-center mb-8">
+        <div class="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center font-bold text-xl mx-auto mb-3">O</div>
+        <h1 class="text-2xl font-bold">Open Mon Stack</h1>
+        <p class="text-sm text-gray-500 mt-1">Sign in to continue</p>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Username</label>
+          <input type="text" x-model="loginForm.username" @keydown.enter="login()" autofocus
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Password</label>
+          <input type="password" x-model="loginForm.password" @keydown.enter="login()"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div x-show="loginError" class="text-xs text-red-400" x-text="loginError"></div>
+        <button @click="login()" :disabled="loginLoading"
+          :class="loginLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-orange-600'"
+          class="w-full bg-orange-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
+          <span x-text="loginLoading ? 'Signing in…' : 'Sign In'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Setup (first run) -->
+  <div x-show="authChecked && view === 'setup'" class="flex h-full items-center justify-center bg-gray-950">
+    <div class="w-full max-w-sm">
+      <div class="text-center mb-8">
+        <div class="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center font-bold text-xl mx-auto mb-3">O</div>
+        <h1 class="text-2xl font-bold">Open Mon Stack</h1>
+        <p class="text-sm text-gray-500 mt-1">Create your admin account to get started</p>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Username</label>
+          <input type="text" x-model="setupForm.username" @keydown.enter="setup()" autofocus
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Password (min 8 characters)</label>
+          <input type="password" x-model="setupForm.password" @keydown.enter="setup()"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div x-show="setupError" class="text-xs text-red-400" x-text="setupError"></div>
+        <button @click="setup()" :disabled="setupLoading"
+          :class="setupLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-orange-600'"
+          class="w-full bg-orange-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
+          <span x-text="setupLoading ? 'Creating account…' : 'Create Admin Account'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div x-show="authChecked && loggedIn" class="flex h-full">
 
     <!-- Sidebar -->
     <aside class="w-60 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0">
@@ -48,9 +112,44 @@
           Target Servers
           <span x-show="targets.length>0" class="ml-auto bg-gray-700 text-gray-300 text-xs rounded-full px-1.5 py-0.5" x-text="targets.length"></span>
         </button>
+
+        <button @click="view='channels'"
+          :class="['channels','alert-rules','alert-events'].includes(view) ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'"
+          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          Alerts
+          <span x-show="alertEvents.filter(e=>e.status==='firing').length>0" class="ml-auto bg-red-900 text-red-300 text-xs rounded-full px-1.5 py-0.5" x-text="alertEvents.filter(e=>e.status==='firing').length"></span>
+        </button>
+
+        <div x-show="['channels','alert-rules','alert-events'].includes(view)" class="ml-5 space-y-0.5">
+          <button @click="view='channels'" :class="view==='channels'?'text-orange-400':'text-gray-500 hover:text-gray-300'" class="w-full text-left text-xs px-3 py-1.5 rounded transition-colors">↳ Channels</button>
+          <button @click="view='alert-rules'" :class="view==='alert-rules'?'text-orange-400':'text-gray-500 hover:text-gray-300'" class="w-full text-left text-xs px-3 py-1.5 rounded transition-colors">↳ Alert Rules</button>
+          <button @click="view='alert-events'; loadAlertEvents()" :class="view==='alert-events'?'text-orange-400':'text-gray-500 hover:text-gray-300'" class="w-full text-left text-xs px-3 py-1.5 rounded transition-colors">↳ History</button>
+        </div>
+
+        <!-- Users (admin only) -->
+        <button x-show="currentUser && currentUser.role === 'admin'" @click="view='users'; loadUsers()"
+          :class="view==='users' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'"
+          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          Users
+        </button>
       </nav>
 
-      <div class="p-3 border-t border-gray-800 text-xs text-gray-600">v0.1.0-alpha</div>
+      <!-- User info + logout -->
+      <div class="p-3 border-t border-gray-800 space-y-2">
+        <div class="flex items-center gap-2 px-1">
+          <div class="w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center text-xs font-medium" x-text="currentUser ? currentUser.username[0].toUpperCase() : '?'"></div>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-medium truncate" x-text="currentUser ? currentUser.username : ''"></div>
+            <div class="text-xs text-gray-600 capitalize" x-text="currentUser ? currentUser.role : ''"></div>
+          </div>
+          <button @click="logout()" title="Sign out" class="text-gray-600 hover:text-white transition-colors p-1 rounded">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          </button>
+        </div>
+        <div class="text-xs text-gray-600 px-1">v0.1.0-alpha</div>
+      </div>
     </aside>
 
     <!-- Main -->
@@ -61,13 +160,13 @@
         <div class="flex items-center justify-between mb-6">
           <h1 class="text-2xl font-bold">Monitoring Stack</h1>
           <div class="flex gap-3">
-            <button @click="deployStack()" :disabled="stackDeploying"
+            <button x-show="currentUser && currentUser.role === 'admin'" @click="deployStack()" :disabled="stackDeploying"
               :class="stackDeploying ? 'opacity-50 cursor-not-allowed bg-green-700' : 'bg-green-500 hover:bg-green-600'"
               class="text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-14 9V3z"/></svg>
               <span x-text="stackDeploying ? 'Deploying…' : 'Deploy Stack'"></span>
             </button>
-            <button @click="stopStack()" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+            <button x-show="currentUser && currentUser.role === 'admin'" @click="stopStack()" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1" stroke-width="2"/></svg>
               Stop
             </button>
@@ -114,10 +213,25 @@
 
         <div x-show="stackStatus.state==='up'" class="bg-gray-900 border border-gray-800 rounded-xl p-5">
           <h2 class="text-sm font-medium text-gray-400 mb-3">Quick Links</h2>
-          <div class="flex gap-6">
-            <a :href="'http://localhost:'+stackConfig.grafana_port" target="_blank" class="text-sm text-orange-400 hover:text-orange-300 transition-colors">Grafana :<span x-text="stackConfig.grafana_port"></span></a>
-            <a :href="'http://localhost:'+stackConfig.prometheus_port" target="_blank" class="text-sm text-orange-400 hover:text-orange-300 transition-colors">Prometheus :<span x-text="stackConfig.prometheus_port"></span></a>
-            <a :href="'http://localhost:'+stackConfig.loki_port" target="_blank" class="text-sm text-orange-400 hover:text-orange-300 transition-colors">Loki :<span x-text="stackConfig.loki_port"></span></a>
+          <div class="flex gap-3 flex-wrap">
+            <template x-for="link in [
+              {name:'Grafana', port: stackConfig.grafana_port, svc:'grafana'},
+              {name:'Prometheus', port: stackConfig.prometheus_port, svc:'prometheus'},
+              {name:'Loki', port: stackConfig.loki_port, svc:'loki'},
+              {name:'Alertmanager', port: stackConfig.alertmanager_port, svc:'alertmanager'}
+            ]" :key="link.svc">
+              <a :href="'http://localhost:'+link.port" target="_blank"
+                class="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg px-3 py-2 transition-colors group">
+                <div :class="(stackStatus.services||[]).find(s=>s.name===link.svc)?.health==='healthy' ? 'bg-green-400' : (stackStatus.services||[]).find(s=>s.name===link.svc)?.running ? 'bg-yellow-400' : 'bg-gray-600'"
+                  class="w-2 h-2 rounded-full shrink-0"></div>
+                <span class="text-sm text-orange-400 group-hover:text-orange-300 transition-colors" x-text="link.name"></span>
+                <span class="text-xs text-gray-500" x-text="':'+link.port"></span>
+                <span x-show="link.svc==='grafana' && stackConfig.grafana_admin_password"
+                  @click.prevent="copyText('admin:'+stackConfig.grafana_admin_password)"
+                  title="Copy login credentials"
+                  class="text-xs text-gray-600 hover:text-gray-300 cursor-pointer border-l border-gray-700 pl-2">admin:●●●</span>
+              </a>
+            </template>
           </div>
         </div>
       </div>
@@ -140,11 +254,28 @@
               <input type="number" x-model="stackConfig.loki_port" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
             </div>
             <div>
+              <label class="block text-xs text-gray-500 mb-1">Alertmanager Port</label>
+              <input type="number" x-model="stackConfig.alertmanager_port" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+            </div>
+            <div class="col-span-2">
               <label class="block text-xs text-gray-500 mb-1">Data Directory</label>
               <input type="text" x-model="stackConfig.data_dir" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
             </div>
+            <div class="col-span-2">
+              <label class="block text-xs text-gray-500 mb-1">Grafana Admin Password</label>
+              <div class="flex gap-2">
+                <input :type="showGrafanaPw ? 'text' : 'password'" x-model="stackConfig.grafana_admin_password"
+                  class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-orange-500"/>
+                <button @click="showGrafanaPw=!showGrafanaPw"
+                  class="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors"
+                  x-text="showGrafanaPw ? 'Hide' : 'Show'"></button>
+                <button @click="copyText(stackConfig.grafana_admin_password)"
+                  class="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors">Copy</button>
+              </div>
+              <p class="text-xs text-gray-600 mt-1">Login to Grafana as <code class="text-gray-400">admin</code> with this password. Change it and redeploy to update.</p>
+            </div>
           </div>
-          <button @click="saveStackConfig()" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Save</button>
+          <button x-show="currentUser && currentUser.role === 'admin'" @click="saveStackConfig()" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Save</button>
         </div>
       </div>
 
@@ -172,7 +303,7 @@
             <h1 class="text-2xl font-bold">Target Servers</h1>
             <p class="text-sm text-gray-500 mt-1">Remote servers monitored by this stack. Adding a target auto-reloads Prometheus.</p>
           </div>
-          <button @click="showAddTarget=true" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+          <button x-show="currentUser && currentUser.role === 'admin'" @click="showAddTarget=true" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             Add Target
           </button>
@@ -195,7 +326,7 @@
               </div>
               <div class="flex items-center gap-2 shrink-0">
                 <button @click="openTargetDetail(t)" class="text-sm bg-gray-800 hover:bg-gray-700 text-white px-3 py-1.5 rounded-lg transition-colors">Setup Script</button>
-                <button @click="deleteTarget(t.id)" class="text-gray-600 hover:text-red-400 transition-colors p-1.5">
+                <button x-show="currentUser && currentUser.role === 'admin'" @click="deleteTarget(t.id)" class="text-gray-600 hover:text-red-400 transition-colors p-1.5">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
               </div>
@@ -209,7 +340,135 @@
           </div>
           <h3 class="text-lg font-medium text-gray-400 mb-2">No target servers yet</h3>
           <p class="text-sm text-gray-600 mb-6">Add a remote server and generate an agent install script for it.</p>
-          <button @click="showAddTarget=true" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors">Add first target</button>
+          <button x-show="currentUser && currentUser.role === 'admin'" @click="showAddTarget=true" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors">Add first target</button>
+        </div>
+      </div>
+
+      <!-- Channels -->
+      <div x-show="view==='channels'" class="p-8">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-2xl font-bold">Notification Channels</h1>
+            <p class="text-sm text-gray-500 mt-1">Where to send alerts — Slack, Discord, ntfy, n8n, email, or any webhook.</p>
+          </div>
+          <button x-show="currentUser && currentUser.role === 'admin'" @click="showAddChannel=true; newChannel={name:'',type:'webhook',url:'',topic:'',smtp_host:'',smtp_port:587,smtp_username:'',smtp_password:'',smtp_from:'',smtp_to:''}" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Channel
+          </button>
+        </div>
+
+        <div class="space-y-3" x-show="channels.length>0">
+          <template x-for="ch in channels" :key="ch.id">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 flex items-center gap-4">
+              <div class="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center shrink-0 text-lg" x-text="channelIcon(ch.type)"></div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium" x-text="ch.name"></div>
+                <div class="text-sm text-gray-500" x-text="ch.type + (ch.topic ? ' / ' + ch.topic : '')"></div>
+                <div class="text-xs text-gray-600 truncate mt-0.5" x-text="ch.type==='email' ? (ch.smtp_from + ' → ' + ch.smtp_to) : ch.url"></div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button @click="testChannel(ch)" :disabled="testingChannel===ch.id"
+                  :class="testingChannel===ch.id?'opacity-50 cursor-not-allowed':'hover:bg-gray-600'"
+                  class="text-xs bg-gray-800 text-gray-300 px-3 py-1.5 rounded-lg transition-colors">
+                  <span x-text="testingChannel===ch.id ? 'Sending…' : 'Test'"></span>
+                </button>
+                <button x-show="currentUser && currentUser.role === 'admin'" @click="deleteChannel(ch.id)" class="text-gray-600 hover:text-red-400 transition-colors p-1.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div x-show="channels.length===0" class="text-center py-20">
+          <div class="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          </div>
+          <h3 class="text-lg font-medium text-gray-400 mb-2">No channels yet</h3>
+          <p class="text-sm text-gray-600 mb-6">Add Slack, Discord, ntfy, n8n, email or a generic webhook to receive alert notifications.</p>
+          <button x-show="currentUser && currentUser.role === 'admin'" @click="showAddChannel=true; newChannel={name:'',type:'webhook',url:'',topic:'',smtp_host:'',smtp_port:587,smtp_username:'',smtp_password:'',smtp_from:'',smtp_to:''}" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors">Add first channel</button>
+        </div>
+      </div>
+
+      <!-- Alert Rules -->
+      <div x-show="view==='alert-rules'" class="p-8">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-2xl font-bold">Alert Rules</h1>
+            <p class="text-sm text-gray-500 mt-1">PromQL-based rules that trigger when conditions are met. Presets are built-in and always editable.</p>
+          </div>
+          <button x-show="currentUser && currentUser.role === 'admin'" @click="showAddRule=true; newRule={name:'',expr:'',for:'5m',severity:'warning',summary:'',description:''}" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Custom Rule
+          </button>
+        </div>
+
+        <div class="space-y-3">
+          <template x-for="r in alertRules" :key="r.id">
+            <div class="bg-gray-900 border rounded-xl p-5 flex items-start gap-4 transition-colors"
+              :class="r.enabled ? 'border-gray-800' : 'border-gray-800 opacity-50'">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="font-medium" x-text="r.name"></span>
+                  <span x-show="r.preset" class="text-xs bg-blue-900/60 text-blue-300 px-1.5 py-0.5 rounded">preset</span>
+                  <span :class="r.severity==='critical'?'bg-red-900/60 text-red-300':'bg-yellow-900/60 text-yellow-300'" class="text-xs px-1.5 py-0.5 rounded" x-text="r.severity"></span>
+                </div>
+                <div class="text-xs text-gray-500 font-mono mb-1" x-text="r.expr"></div>
+                <div class="text-xs text-gray-600">For <span class="text-gray-400" x-text="r.for"></span> — <span x-text="r.summary"></span></div>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <!-- Toggle (admin only) -->
+                <button x-show="currentUser && currentUser.role === 'admin'" @click="toggleAlertRule(r)" class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors"
+                  :class="r.enabled ? 'bg-orange-500' : 'bg-gray-700'">
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                    :class="r.enabled ? 'translate-x-4' : 'translate-x-1'"></span>
+                </button>
+                <span x-show="currentUser && currentUser.role !== 'admin'" :class="r.enabled ? 'bg-orange-500/40' : 'bg-gray-700'" class="inline-flex h-5 w-9 items-center rounded-full">
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white" :class="r.enabled ? 'translate-x-4' : 'translate-x-1'"></span>
+                </span>
+                <button x-show="!r.preset && currentUser && currentUser.role === 'admin'" @click="deleteAlertRule(r.id)" class="text-gray-600 hover:text-red-400 transition-colors p-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </div>
+          </template>
+          <div x-show="alertRules.length===0" class="text-center py-12 text-gray-600 text-sm">No alert rules found.</div>
+        </div>
+      </div>
+
+      <!-- Alert History -->
+      <div x-show="view==='alert-events'" class="p-8">
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-2xl font-bold">Alert History</h1>
+          <button @click="loadAlertEvents()" class="text-gray-500 hover:text-white transition-colors p-2 rounded-lg hover:bg-gray-800">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          </button>
+        </div>
+
+        <div class="space-y-2" x-show="alertEvents.length>0">
+          <template x-for="(e,i) in alertEvents" :key="i">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 flex items-center gap-4">
+              <div :class="e.status==='firing'?'bg-red-500':'bg-green-500'" class="w-2 h-2 rounded-full shrink-0"></div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-0.5">
+                  <span class="font-medium text-sm" x-text="e.alert_name"></span>
+                  <span :class="e.severity==='critical'?'bg-red-900/60 text-red-300':'bg-yellow-900/60 text-yellow-300'" class="text-xs px-1.5 py-0.5 rounded" x-text="e.severity"></span>
+                  <span :class="e.status==='firing'?'bg-red-900/40 text-red-400':'bg-green-900/40 text-green-400'" class="text-xs px-1.5 py-0.5 rounded uppercase font-medium" x-text="e.status"></span>
+                </div>
+                <div class="text-xs text-gray-500" x-text="e.summary"></div>
+                <div class="text-xs text-gray-700 mt-0.5" x-text="e.instance ? 'Instance: ' + e.instance : ''"></div>
+              </div>
+              <div class="text-xs text-gray-600 shrink-0" x-text="new Date(e.fired_at).toLocaleString()"></div>
+            </div>
+          </template>
+        </div>
+
+        <div x-show="alertEvents.length===0" class="text-center py-20">
+          <div class="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          </div>
+          <h3 class="text-lg font-medium text-gray-400 mb-2">No alerts yet</h3>
+          <p class="text-sm text-gray-600">Alerts will appear here when Alertmanager sends notifications.</p>
         </div>
       </div>
 
@@ -262,7 +521,228 @@
         </div>
       </div>
 
+      <!-- Users -->
+      <div x-show="view==='users'" class="p-8">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-2xl font-bold">Users</h1>
+            <p class="text-sm text-gray-500 mt-1">Manage accounts that can access Open Mon Stack.</p>
+          </div>
+          <button @click="showAddUser=true; newUser={username:'',password:'',role:'viewer'}" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add User
+          </button>
+        </div>
+
+        <div class="space-y-3" x-show="users.length > 0">
+          <template x-for="u in users" :key="u.id">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 flex items-center gap-4">
+              <div class="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center font-medium text-sm shrink-0"
+                x-text="u.username[0].toUpperCase()"></div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium" x-text="u.username"></div>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <span :class="u.role==='admin'?'bg-orange-900/50 text-orange-300':'bg-gray-700 text-gray-400'"
+                    class="text-xs px-2 py-0.5 rounded-full capitalize" x-text="u.role"></span>
+                  <span x-show="currentUser && u.id === currentUser.id" class="text-xs text-gray-600">(you)</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button @click="openEditUser(u)" class="text-sm bg-gray-800 hover:bg-gray-700 text-white px-3 py-1.5 rounded-lg transition-colors">Edit</button>
+                <button @click="deleteUser(u.id)" :disabled="currentUser && u.id === currentUser.id"
+                  :class="currentUser && u.id === currentUser.id ? 'opacity-30 cursor-not-allowed' : 'hover:text-red-400'"
+                  class="text-gray-600 transition-colors p-1.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div x-show="users.length === 0" class="text-center py-20 text-gray-600 text-sm">No users found.</div>
+      </div>
+
     </main>
+  </div>
+
+  <!-- Add User Modal -->
+  <div x-show="showAddUser" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" @click.self="showAddUser=false">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm">
+      <h2 class="font-semibold mb-4">Add User</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Username</label>
+          <input type="text" x-model="newUser.username" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Password (min 8 characters)</label>
+          <input type="password" x-model="newUser.password" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Role</label>
+          <select x-model="newUser.role" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500">
+            <option value="viewer">Viewer (read-only)</option>
+            <option value="admin">Admin (full access)</option>
+          </select>
+        </div>
+        <div x-show="userError" class="text-xs text-red-400" x-text="userError"></div>
+        <div class="flex gap-3 pt-1">
+          <button @click="addUser()" :disabled="!newUser.username||newUser.password.length<8"
+            :class="(!newUser.username||newUser.password.length<8)?'opacity-40 cursor-not-allowed':'hover:bg-orange-600'"
+            class="flex-1 bg-orange-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Add User</button>
+          <button @click="showAddUser=false; userError=''" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit User Modal -->
+  <div x-show="showEditUser" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" @click.self="showEditUser=false">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm">
+      <h2 class="font-semibold mb-4">Edit User</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Username</label>
+          <div class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-400" x-text="editingUser && editingUser.username"></div>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">New Password (leave blank to keep current)</label>
+          <input type="password" x-model="editUserForm.password" placeholder="••••••••"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Role</label>
+          <select x-model="editUserForm.role" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500">
+            <option value="viewer">Viewer (read-only)</option>
+            <option value="admin">Admin (full access)</option>
+          </select>
+        </div>
+        <div x-show="userError" class="text-xs text-red-400" x-text="userError"></div>
+        <div class="flex gap-3 pt-1">
+          <button @click="updateUser()" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Save Changes</button>
+          <button @click="showEditUser=false; userError=''" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Channel Modal -->
+  <div x-show="showAddChannel" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" @click.self="showAddChannel=false">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md">
+      <h2 class="font-semibold mb-4">Add Notification Channel</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Channel Name</label>
+          <input type="text" x-model="newChannel.name" placeholder="My Slack" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Type</label>
+          <select x-model="newChannel.type" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500">
+            <option value="slack">Slack (Incoming Webhook)</option>
+            <option value="discord">Discord (Webhook)</option>
+            <option value="ntfy">ntfy (Push Notifications)</option>
+            <option value="n8n">n8n (Webhook Trigger)</option>
+            <option value="webhook">Generic Webhook</option>
+            <option value="email">Email (SMTP)</option>
+          </select>
+        </div>
+        <div x-show="newChannel.type!=='email'">
+          <label class="block text-xs text-gray-500 mb-1" x-text="newChannel.type==='ntfy' ? 'ntfy Server URL' : newChannel.type==='n8n' ? 'n8n Webhook URL' : 'Webhook URL'"></label>
+          <input type="url" x-model="newChannel.url"
+            :placeholder="newChannel.type==='ntfy' ? 'https://ntfy.sh' : newChannel.type==='n8n' ? 'http://n8n:5678/webhook/…' : 'https://hooks.slack.com/services/…'"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+          <p x-show="newChannel.type==='n8n'" class="text-xs text-gray-600 mt-1">Paste the webhook URL from your n8n Webhook Trigger node.</p>
+        </div>
+        <div x-show="newChannel.type==='ntfy'">
+          <label class="block text-xs text-gray-500 mb-1">Topic</label>
+          <input type="text" x-model="newChannel.topic" placeholder="my-alerts" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+          <p class="text-xs text-gray-600 mt-1">Notifications go to <code class="text-gray-400">{server}/{topic}</code></p>
+        </div>
+        <div x-show="newChannel.type==='email'" class="space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="col-span-2">
+              <label class="block text-xs text-gray-500 mb-1">SMTP Host</label>
+              <input type="text" x-model="newChannel.smtp_host" placeholder="smtp.gmail.com" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">SMTP Port</label>
+              <input type="number" x-model.number="newChannel.smtp_port" placeholder="587" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+              <p class="text-xs text-gray-600 mt-1">587 STARTTLS · 465 TLS · 25 plain</p>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Username</label>
+              <input type="text" x-model="newChannel.smtp_username" placeholder="user@example.com" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+            </div>
+            <div class="col-span-2">
+              <label class="block text-xs text-gray-500 mb-1">Password / App Password</label>
+              <input type="password" x-model="newChannel.smtp_password" placeholder="••••••••" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">From Address</label>
+              <input type="email" x-model="newChannel.smtp_from" placeholder="alerts@example.com" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">To Address(es)</label>
+              <input type="text" x-model="newChannel.smtp_to" placeholder="ops@example.com" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+              <p class="text-xs text-gray-600 mt-1">Comma-separate multiple recipients</p>
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-3 pt-1">
+          <button @click="addChannel()"
+            :disabled="!newChannel.name || (newChannel.type!=='email' && !newChannel.url) || (newChannel.type==='email' && (!newChannel.smtp_host||!newChannel.smtp_from||!newChannel.smtp_to))"
+            :class="(!newChannel.name || (newChannel.type!=='email' && !newChannel.url) || (newChannel.type==='email' && (!newChannel.smtp_host||!newChannel.smtp_from||!newChannel.smtp_to)))?'opacity-40 cursor-not-allowed':'hover:bg-orange-600'"
+            class="flex-1 bg-orange-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Add Channel</button>
+          <button @click="showAddChannel=false" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Alert Rule Modal -->
+  <div x-show="showAddRule" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" @click.self="showAddRule=false">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-lg">
+      <h2 class="font-semibold mb-4">Add Custom Alert Rule</h2>
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Rule Name</label>
+            <input type="text" x-model="newRule.name" placeholder="HighLoad" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Severity</label>
+            <select x-model="newRule.severity" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500">
+              <option value="warning">Warning</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">PromQL Expression</label>
+          <input type="text" x-model="newRule.expr" placeholder="node_load1 > 4" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Duration (for)</label>
+            <input type="text" x-model="newRule.for" placeholder="5m" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Summary</label>
+            <input type="text" x-model="newRule.summary" placeholder="Short description" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Description (optional)</label>
+          <input type="text" x-model="newRule.description" placeholder="Detailed description with {{ $labels.instance }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div class="flex gap-3 pt-1">
+          <button @click="addAlertRule()" :disabled="!newRule.name||!newRule.expr||!newRule.for"
+            :class="(!newRule.name||!newRule.expr||!newRule.for)?'opacity-40 cursor-not-allowed':'hover:bg-orange-600'"
+            class="flex-1 bg-orange-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Add Rule</button>
+          <button @click="showAddRule=false" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Add Target Modal -->
@@ -342,11 +822,24 @@
   <script>
     function app() {
       return {
+        // Auth state
+        authChecked: false,
+        loggedIn: false,
+        currentUser: null,
+        loginForm: { username: '', password: '' },
+        loginError: '',
+        loginLoading: false,
+        setupForm: { username: '', password: '' },
+        setupError: '',
+        setupLoading: false,
+
+        // App state
         view: 'stack',
         stackStatus: { state: '', services: [], log: [] },
-        stackConfig: { grafana_port: 3000, prometheus_port: 9090, loki_port: 3100, data_dir: '/opt/open-mon-stack' },
+        stackConfig: { grafana_port: 3000, prometheus_port: 9090, loki_port: 3100, alertmanager_port: 9093, data_dir: '/opt/open-mon-stack' },
         stackLog: [],
         stackDeploying: false,
+        showGrafanaPw: false,
         targets: [],
         selectedTarget: null,
         scriptData: {},
@@ -354,9 +847,91 @@
         addStep: 1,
         newTarget: { name: '', host: '', agents: [] },
         agentCatalog: [],
+        // Alerts & Channels
+        channels: [],
+        alertRules: [],
+        alertEvents: [],
+        showAddChannel: false,
+        newChannel: { name: '', type: 'webhook', url: '', topic: '', smtp_host: '', smtp_port: 587, smtp_username: '', smtp_password: '', smtp_from: '', smtp_to: '' },
+        showAddRule: false,
+        newRule: { name: '', expr: '', for: '5m', severity: 'warning', summary: '', description: '' },
+        testingChannel: null,
+        // Users
+        users: [],
+        showAddUser: false,
+        newUser: { username: '', password: '', role: 'viewer' },
+        showEditUser: false,
+        editingUser: null,
+        editUserForm: { password: '', role: 'viewer' },
+        userError: '',
 
         async init() {
-          await Promise.all([this.loadStackStatus(), this.loadStackConfig(), this.loadTargets(), this.loadAgentCatalog()]);
+          const res = await fetch('/api/auth/me');
+          if (res.ok) {
+            this.currentUser = await res.json();
+            this.loggedIn = true;
+            this.authChecked = true;
+            await Promise.all([this.loadStackStatus(), this.loadStackConfig(), this.loadTargets(), this.loadAgentCatalog(), this.loadChannels(), this.loadAlertRules(), this.loadAlertEvents()]);
+          } else {
+            const status = await fetch('/api/setup/status').then(r => r.json()).catch(() => ({ needs_setup: false }));
+            this.view = status.needs_setup ? 'setup' : 'login';
+            this.authChecked = true;
+          }
+        },
+
+        async login() {
+          this.loginError = '';
+          this.loginLoading = true;
+          try {
+            const res = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.loginForm)
+            });
+            if (res.ok) {
+              this.currentUser = await res.json();
+              this.loggedIn = true;
+              this.loginForm = { username: '', password: '' };
+              this.view = 'stack';
+              await Promise.all([this.loadStackStatus(), this.loadStackConfig(), this.loadTargets(), this.loadAgentCatalog(), this.loadChannels(), this.loadAlertRules(), this.loadAlertEvents()]);
+            } else {
+              const d = await res.json().catch(() => ({}));
+              this.loginError = d.message || 'Invalid username or password';
+            }
+          } finally {
+            this.loginLoading = false;
+          }
+        },
+
+        async setup() {
+          this.setupError = '';
+          this.setupLoading = true;
+          try {
+            const res = await fetch('/api/setup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.setupForm)
+            });
+            if (res.ok) {
+              this.currentUser = await res.json();
+              this.loggedIn = true;
+              this.setupForm = { username: '', password: '' };
+              this.view = 'stack';
+              await Promise.all([this.loadStackStatus(), this.loadStackConfig(), this.loadTargets(), this.loadAgentCatalog(), this.loadChannels(), this.loadAlertRules(), this.loadAlertEvents()]);
+            } else {
+              const d = await res.json().catch(() => ({}));
+              this.setupError = d.message || 'Setup failed';
+            }
+          } finally {
+            this.setupLoading = false;
+          }
+        },
+
+        async logout() {
+          await fetch('/api/auth/logout', { method: 'POST' });
+          this.loggedIn = false;
+          this.currentUser = null;
+          this.view = 'login';
         },
 
         async loadStackStatus() {
@@ -379,6 +954,7 @@
               grafana_port: parseInt(this.stackConfig.grafana_port),
               prometheus_port: parseInt(this.stackConfig.prometheus_port),
               loki_port: parseInt(this.stackConfig.loki_port),
+              alertmanager_port: parseInt(this.stackConfig.alertmanager_port),
               data_dir: this.stackConfig.data_dir
             })
           });
@@ -464,6 +1040,86 @@
           return a ? a.name : type;
         },
 
+        // ── Channels ──────────────────────────────────────────────────────────
+
+        async loadChannels() {
+          const res = await fetch('/api/channels');
+          if (res.ok) this.channels = await res.json();
+        },
+
+        async addChannel() {
+          const res = await fetch('/api/channels', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.newChannel)
+          });
+          if (res.ok) {
+            await this.loadChannels();
+            this.showAddChannel = false;
+            this.newChannel = { name: '', type: 'webhook', url: '', topic: '' };
+          }
+        },
+
+        async deleteChannel(id) {
+          if (!confirm('Remove this channel?')) return;
+          await fetch('/api/channels/' + id, { method: 'DELETE' });
+          await this.loadChannels();
+        },
+
+        async testChannel(ch) {
+          this.testingChannel = ch.id;
+          const res = await fetch('/api/channels/' + ch.id + '/test', { method: 'POST' });
+          this.testingChannel = null;
+          if (res.ok) alert('Test notification sent successfully!');
+          else { const d = await res.json(); alert('Failed: ' + (d.message || 'Unknown error')); }
+        },
+
+        channelIcon(type) {
+          return { slack: '💬', discord: '🎮', ntfy: '🔔', n8n: '⚡', webhook: '🔗', email: '✉️' }[type] || '🔗';
+        },
+
+        // ── Alert Rules ───────────────────────────────────────────────────────
+
+        async loadAlertRules() {
+          const res = await fetch('/api/alerts/rules');
+          if (res.ok) this.alertRules = await res.json();
+        },
+
+        async addAlertRule() {
+          const res = await fetch('/api/alerts/rules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.newRule)
+          });
+          if (res.ok) {
+            await this.loadAlertRules();
+            this.showAddRule = false;
+            this.newRule = { name: '', expr: '', for: '5m', severity: 'warning', summary: '', description: '' };
+          }
+        },
+
+        async toggleAlertRule(r) {
+          const res = await fetch('/api/alerts/rules/' + r.id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: !r.enabled })
+          });
+          if (res.ok) await this.loadAlertRules();
+        },
+
+        async deleteAlertRule(id) {
+          if (!confirm('Delete this alert rule?')) return;
+          await fetch('/api/alerts/rules/' + id, { method: 'DELETE' });
+          await this.loadAlertRules();
+        },
+
+        // ── Alert Events ──────────────────────────────────────────────────────
+
+        async loadAlertEvents() {
+          const res = await fetch('/api/alerts/events');
+          if (res.ok) this.alertEvents = await res.json();
+        },
+
         async copyText(text) {
           if (!text) return;
           try { await navigator.clipboard.writeText(text); }
@@ -474,6 +1130,66 @@
             el.select();
             document.execCommand('copy');
             document.body.removeChild(el);
+          }
+        },
+
+        // ── Users ─────────────────────────────────────────────────────────────
+
+        async loadUsers() {
+          const res = await fetch('/api/users');
+          if (res.ok) this.users = await res.json();
+        },
+
+        async addUser() {
+          this.userError = '';
+          const res = await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.newUser)
+          });
+          if (res.ok) {
+            await this.loadUsers();
+            this.showAddUser = false;
+            this.newUser = { username: '', password: '', role: 'viewer' };
+          } else {
+            const d = await res.json().catch(() => ({}));
+            this.userError = d.message || 'Failed to create user';
+          }
+        },
+
+        openEditUser(u) {
+          this.editingUser = u;
+          this.editUserForm = { password: '', role: u.role };
+          this.userError = '';
+          this.showEditUser = true;
+        },
+
+        async updateUser() {
+          this.userError = '';
+          const payload = { role: this.editUserForm.role };
+          if (this.editUserForm.password) payload.password = this.editUserForm.password;
+          const res = await fetch('/api/users/' + this.editingUser.id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (res.ok) {
+            await this.loadUsers();
+            this.showEditUser = false;
+          } else {
+            const d = await res.json().catch(() => ({}));
+            this.userError = d.message || 'Failed to update user';
+          }
+        },
+
+        async deleteUser(id) {
+          if (!confirm('Delete this user?')) return;
+          const res = await fetch('/api/users/' + id, { method: 'DELETE' });
+          if (res.ok) {
+            await this.loadUsers();
+          } else {
+            const d = await res.json().catch(() => ({}));
+            alert(d.message || 'Failed to delete user');
           }
         }
       };

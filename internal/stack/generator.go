@@ -76,8 +76,9 @@ func (g *Generator) WriteConfigs(outDir string, cfg models.StackConfig, targets 
 	staticFiles := map[string]string{
 		"templates/loki/loki-config.yml":                    filepath.Join(outDir, "loki", "loki-config.yml"),
 		"templates/grafana/datasources/datasources.yml":     filepath.Join(outDir, "grafana", "provisioning", "datasources", "datasources.yml"),
-		"templates/grafana/dashboards/dashboards.yml":       filepath.Join(outDir, "grafana", "provisioning", "dashboards", "dashboards.yml"),
-		"templates/grafana/dashboards/system-overview.json": filepath.Join(outDir, "grafana", "provisioning", "dashboards", "system-overview.json"),
+		"templates/grafana/dashboards/dashboards.yml":          filepath.Join(outDir, "grafana", "provisioning", "dashboards", "dashboards.yml"),
+		"templates/grafana/dashboards/system-overview.json":    filepath.Join(outDir, "grafana", "provisioning", "dashboards", "system-overview.json"),
+		"templates/grafana/dashboards/docker-containers.json":  filepath.Join(outDir, "grafana", "provisioning", "dashboards", "docker-containers.json"),
 	}
 	for src, dst := range staticFiles {
 		data, err := templateFS.ReadFile(src)

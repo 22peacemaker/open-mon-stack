@@ -15,18 +15,21 @@ const (
 
 // StackConfig holds configuration for the central Prometheus/Grafana/Loki deployment.
 type StackConfig struct {
-	GrafanaPort    int    `json:"grafana_port"`
-	PrometheusPort int    `json:"prometheus_port"`
-	LokiPort       int    `json:"loki_port"`
-	DataDir        string `json:"data_dir"`
+	GrafanaPort          int    `json:"grafana_port"`
+	PrometheusPort       int    `json:"prometheus_port"`
+	LokiPort             int    `json:"loki_port"`
+	AlertmanagerPort     int    `json:"alertmanager_port"`
+	DataDir              string `json:"data_dir"`
+	GrafanaAdminPassword string `json:"grafana_admin_password,omitempty"`
 }
 
 func DefaultStackConfig() StackConfig {
 	return StackConfig{
-		GrafanaPort:    3000,
-		PrometheusPort: 9090,
-		LokiPort:       3100,
-		DataDir:        "/opt/open-mon-stack",
+		GrafanaPort:      3000,
+		PrometheusPort:   9090,
+		LokiPort:         3100,
+		AlertmanagerPort: 9093,
+		DataDir:          "/opt/open-mon-stack",
 	}
 }
 
@@ -47,6 +50,7 @@ const (
 	ServiceGrafana      ServiceName = "grafana"
 	ServiceLoki         ServiceName = "loki"
 	ServiceNodeExporter ServiceName = "node-exporter"
+	ServiceAlertmanager ServiceName = "alertmanager"
 )
 
 type ServiceStatus struct {

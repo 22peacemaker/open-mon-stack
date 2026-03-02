@@ -16,13 +16,14 @@ import (
 type StackHandler struct {
 	store      *storage.Store
 	appDataDir string
+	omsPort    int
 	mu         sync.Mutex
 	deploying  bool
 	cancelFn   context.CancelFunc
 }
 
-func NewStackHandler(store *storage.Store, appDataDir string) *StackHandler {
-	return &StackHandler{store: store, appDataDir: appDataDir}
+func NewStackHandler(store *storage.Store, appDataDir string, omsPort int) *StackHandler {
+	return &StackHandler{store: store, appDataDir: appDataDir, omsPort: omsPort}
 }
 
 func (h *StackHandler) GetConfig(c echo.Context) error {
@@ -44,8 +45,14 @@ func (h *StackHandler) SaveConfig(c echo.Context) error {
 	if cfg.LokiPort == 0 {
 		cfg.LokiPort = 3100
 	}
+	if cfg.AlertmanagerPort == 0 {
+		cfg.AlertmanagerPort = 9093
+	}
 	if cfg.DataDir == "" {
 		cfg.DataDir = "/opt/open-mon-stack"
+	}
+	if cfg.GrafanaAdminPassword == "" {
+		cfg.GrafanaAdminPassword = h.store.GetStackConfig().GrafanaAdminPassword
 	}
 	if err := h.store.SaveStackConfig(cfg); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -71,6 +78,8 @@ func (h *StackHandler) Deploy(c echo.Context) error {
 
 	cfg := h.store.GetStackConfig()
 	targets := h.store.ListTargets()
+	rules := h.store.ListAlertRules()
+	omsPort := h.omsPort
 
 	h.store.SetStackStatus(models.StackStatus{
 		State: models.StackStateRunning,
@@ -88,7 +97,7 @@ func (h *StackHandler) Deploy(c echo.Context) error {
 		d := deploy.NewLocal(h.appDataDir)
 		logFn := func(line string) { h.store.AppendLog(line) }
 
-		err := d.Deploy(ctx, cfg, targets, logFn)
+		err := d.Deploy(ctx, cfg, targets, omsPort, rules, logFn)
 
 		st := h.store.GetStackStatus()
 		if err != nil {
@@ -124,6 +133,23 @@ func (h *StackHandler) LiveStatus(c echo.Context) error {
 	st := h.store.GetStackStatus()
 	st.Services = services
 	return c.JSON(http.StatusOK, st)
+}
+
+// Health returns a lightweight health summary of the running stack services.
+func (h *StackHandler) Health(c echo.Context) error {
+	d := deploy.NewLocal(h.appDataDir)
+	services, err := d.Status(context.Background())
+	if err != nil {
+		return c.JSON(http.StatusOK, map[string]any{"healthy": false, "error": err.Error()})
+	}
+	healthy := len(services) > 0
+	for _, s := range services {
+		if !s.Running {
+			healthy = false
+			break
+		}
+	}
+	return c.JSON(http.StatusOK, map[string]any{"healthy": healthy, "services": services})
 }
 
 // StreamLogs streams deploy log lines via Server-Sent Events.

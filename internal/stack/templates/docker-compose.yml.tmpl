@@ -26,6 +26,24 @@ services:
       - "--web.enable-lifecycle"
     networks:
       - monitoring
+    depends_on:
+      - alertmanager
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: oms-alertmanager
+    restart: unless-stopped
+    ports:
+      - "{{.AlertmanagerPort}}:9093"
+    volumes:
+      - {{.DataDir}}/alertmanager:/etc/alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - monitoring
 
   grafana:
     image: grafana/grafana:latest
@@ -37,7 +55,7 @@ services:
       - grafana_data:/var/lib/grafana
       - {{.DataDir}}/grafana/provisioning:/etc/grafana/provisioning
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD={{.GrafanaAdminPassword}}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_ROOT_URL=http://localhost:{{.GrafanaPort}}
     networks:

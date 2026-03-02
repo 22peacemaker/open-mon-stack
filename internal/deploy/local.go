@@ -30,11 +30,11 @@ func (d *LocalDeployer) stackDir() string {
 }
 
 // Deploy writes all config files, pulls images, and starts the central stack.
-func (d *LocalDeployer) Deploy(ctx context.Context, cfg models.StackConfig, targets []*models.Target, logFn func(string)) error {
+func (d *LocalDeployer) Deploy(ctx context.Context, cfg models.StackConfig, targets []*models.Target, omsPort int, rules []*models.AlertRule, logFn func(string)) error {
 	dir := d.stackDir()
 
 	logFn("Writing configuration files...")
-	if err := d.generator.WriteConfigs(dir, cfg, targets); err != nil {
+	if err := d.generator.WriteConfigs(dir, cfg, targets, omsPort, rules); err != nil {
 		return fmt.Errorf("generate configs: %w", err)
 	}
 	logFn(fmt.Sprintf("Config written to %s", dir))
@@ -86,6 +86,22 @@ func (d *LocalDeployer) ReloadPrometheusConfig(targets []*models.Target, prometh
 		return fmt.Errorf("write prometheus config: %w", err)
 	}
 	return ReloadPrometheus(prometheusPort)
+}
+
+// ReloadAlertRules rewrites alerts.yml and hot-reloads Prometheus to pick up the new rules.
+func (d *LocalDeployer) ReloadAlertRules(rules []*models.AlertRule, prometheusPort int) error {
+	if err := d.generator.WriteAlertRules(d.stackDir(), rules); err != nil {
+		return fmt.Errorf("write alert rules: %w", err)
+	}
+	return ReloadPrometheus(prometheusPort)
+}
+
+// ReloadAlertmanagerConfig rewrites alertmanager.yml and hot-reloads Alertmanager.
+func (d *LocalDeployer) ReloadAlertmanagerConfig(omsPort int, alertmanagerPort int) error {
+	if err := d.generator.WriteAlertmanagerConfig(d.stackDir(), omsPort); err != nil {
+		return fmt.Errorf("write alertmanager config: %w", err)
+	}
+	return ReloadAlertmanager(alertmanagerPort)
 }
 
 func (d *LocalDeployer) checkDockerAvailable() error {

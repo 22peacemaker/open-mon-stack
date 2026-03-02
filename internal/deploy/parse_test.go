@@ -13,12 +13,13 @@ func TestParseComposePSAllRunning(t *testing.T) {
 		{Service: "grafana", Status: "running", Health: "healthy"},
 		{Service: "loki", Status: "running", Health: "healthy"},
 		{Service: "node-exporter", Status: "running", Health: ""},
+		{Service: "alertmanager", Status: "running", Health: ""},
 	}
 	data, _ := json.Marshal(entries)
 	result := parseComposePS(data)
 
-	if len(result) != 4 {
-		t.Fatalf("expected 4 services, got %d", len(result))
+	if len(result) != 5 {
+		t.Fatalf("expected 5 services, got %d", len(result))
 	}
 	for _, svc := range result {
 		if !svc.Running {
@@ -27,10 +28,39 @@ func TestParseComposePSAllRunning(t *testing.T) {
 	}
 }
 
+func TestParseComposePSNDJSON(t *testing.T) {
+	// Docker Compose v2.20+ outputs NDJSON (one object per line), not a JSON array
+	ndjson := "{\"Service\":\"prometheus\",\"Status\":\"running\",\"Health\":\"\"}\n" +
+		"{\"Service\":\"grafana\",\"Status\":\"Up 2 minutes\",\"Health\":\"\"}\n"
+	result := parseComposePS([]byte(ndjson))
+
+	byName := map[models.ServiceName]models.ServiceStatus{}
+	for _, svc := range result {
+		byName[svc.Name] = svc
+	}
+	if !byName[models.ServicePrometheus].Running {
+		t.Error("prometheus should be running (NDJSON)")
+	}
+	if !byName[models.ServiceGrafana].Running {
+		t.Error("grafana should be running (NDJSON with 'Up' prefix)")
+	}
+}
+
+func TestParseComposePSExited(t *testing.T) {
+	entries := []composePSEntry{{Service: "prometheus", Status: "exited", Health: ""}}
+	data, _ := json.Marshal(entries)
+	result := parseComposePS(data)
+	for _, svc := range result {
+		if svc.Name == models.ServicePrometheus && svc.Running {
+			t.Error("exited container should not be Running=true")
+		}
+	}
+}
+
 func TestParseComposePSEmpty(t *testing.T) {
 	result := parseComposePS([]byte("[]"))
-	if len(result) != 4 {
-		t.Fatalf("expected 4 services (unknown state), got %d", len(result))
+	if len(result) != 5 {
+		t.Fatalf("expected 5 services (unknown state), got %d", len(result))
 	}
 	for _, svc := range result {
 		if svc.Running {

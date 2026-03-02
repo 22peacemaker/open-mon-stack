@@ -40,7 +40,7 @@ func main() {
 		log.Fatalf("init storage: %v", err)
 	}
 
-	srv := api.New(store, *dataDir, webFS)
+	srv := api.New(store, *dataDir, webFS, *port)
 
 	addr := fmt.Sprintf(":%d", *port)
 	log.Printf("Open Mon Stack %s running at http://localhost%s", version, addr)

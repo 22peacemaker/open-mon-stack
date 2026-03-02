@@ -1,0 +1,13 @@
+groups:
+  - name: oms-alerts
+    rules:
+{{- range .Rules}}{{if .Enabled}}
+      - alert: {{.Name}}
+        expr: {{.Expr}}
+        for: {{.For}}
+        labels:
+          severity: {{.Severity}}
+        annotations:
+          summary: "{{.Summary}}"
+          description: "{{.Description}}"
+{{- end}}{{end}}
