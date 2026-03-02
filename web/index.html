@@ -114,16 +114,17 @@
         </button>
 
         <button @click="view='channels'"
-          :class="['channels','alert-rules','alert-events'].includes(view) ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'"
+          :class="['channels','alert-rules','alert-events','alert-silences'].includes(view) ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'"
           class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left">
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
           Alerts
           <span x-show="alertEvents.filter(e=>e.status==='firing').length>0" class="ml-auto bg-red-900 text-red-300 text-xs rounded-full px-1.5 py-0.5" x-text="alertEvents.filter(e=>e.status==='firing').length"></span>
         </button>
 
-        <div x-show="['channels','alert-rules','alert-events'].includes(view)" class="ml-5 space-y-0.5">
+        <div x-show="['channels','alert-rules','alert-events','alert-silences'].includes(view)" class="ml-5 space-y-0.5">
           <button @click="view='channels'" :class="view==='channels'?'text-orange-400':'text-gray-500 hover:text-gray-300'" class="w-full text-left text-xs px-3 py-1.5 rounded transition-colors">↳ Channels</button>
           <button @click="view='alert-rules'" :class="view==='alert-rules'?'text-orange-400':'text-gray-500 hover:text-gray-300'" class="w-full text-left text-xs px-3 py-1.5 rounded transition-colors">↳ Alert Rules</button>
+          <button @click="view='alert-silences'; loadSilences()" :class="view==='alert-silences'?'text-orange-400':'text-gray-500 hover:text-gray-300'" class="w-full text-left text-xs px-3 py-1.5 rounded transition-colors">↳ Silences</button>
           <button @click="view='alert-events'; loadAlertEvents()" :class="view==='alert-events'?'text-orange-400':'text-gray-500 hover:text-gray-300'" class="w-full text-left text-xs px-3 py-1.5 rounded transition-colors">↳ History</button>
         </div>
 
@@ -476,6 +477,61 @@
           </div>
           <h3 class="text-lg font-medium text-gray-400 mb-2">No alerts yet</h3>
           <p class="text-sm text-gray-600">Alerts will appear here when Alertmanager sends notifications.</p>
+        </div>
+      </div>
+
+      <!-- Silences (Maintenance Windows) -->
+      <div x-show="view==='alert-silences'" class="p-8">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-2xl font-bold">Silences (Maintenance Windows)</h1>
+            <p class="text-sm text-gray-500 mt-1">Mute alerts for a defined period. Requires the stack to be running.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="loadSilences()" class="text-gray-500 hover:text-white transition-colors p-2 rounded-lg hover:bg-gray-800">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+            <button x-show="currentUser && currentUser.role === 'admin'" @click="showAddSilence=true; silenceError=''; setNewSilenceDefaults()" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Create silence
+            </button>
+          </div>
+        </div>
+
+        <div x-show="stackStatus.state !== 'up'" class="mb-4 text-sm text-amber-400">Stack is not running. Start the stack to view and manage silences.</div>
+
+        <div class="space-y-3" x-show="stackStatus.state === 'up' && silences.length>0">
+          <template x-for="s in silences" :key="s.id">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 flex items-center gap-4">
+              <div :class="{ 'bg-green-500': s.status?.state === 'active', 'bg-yellow-500': s.status?.state === 'pending', 'bg-gray-600': s.status?.state === 'expired' }" class="w-2.5 h-2.5 rounded-full shrink-0"></div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-sm font-medium" x-text="(s.matchers || []).map(m => m.name + '=' + m.value).join(', ') || '—'"></span>
+                  <span :class="{ 'bg-green-900/60 text-green-300': s.status?.state === 'active', 'bg-yellow-900/60 text-yellow-300': s.status?.state === 'pending', 'bg-gray-700 text-gray-400': s.status?.state === 'expired' }" class="text-xs px-1.5 py-0.5 rounded capitalize" x-text="s.status?.state || '—'"></span>
+                </div>
+                <div class="text-xs text-gray-500" x-text="s.comment || '—'"></div>
+                <div class="text-xs text-gray-600 mt-0.5">
+                  <span x-text="s.startsAt ? new Date(s.startsAt).toLocaleString() : ''"></span>
+                  <span x-show="s.endsAt"> – </span>
+                  <span x-text="s.endsAt ? new Date(s.endsAt).toLocaleString() : ''"></span>
+                  <span x-show="s.createdBy" class="ml-2">· by </span>
+                  <span x-text="s.createdBy || ''"></span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button x-show="currentUser && currentUser.role === 'admin' && (s.status?.state === 'active' || s.status?.state === 'pending')" @click="expireSilence(s.id); loadSilences()" class="text-xs bg-gray-800 text-gray-300 hover:text-white px-3 py-1.5 rounded-lg transition-colors">Expire</button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div x-show="stackStatus.state === 'up' && (!silences || silences.length===0)" class="text-center py-20">
+          <div class="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v3m0 0V6a2 2 0 012-2h2a2 2 0 012 2v3m0 0v3a7 7 0 01-7 7z"/></svg>
+          </div>
+          <h3 class="text-lg font-medium text-gray-400 mb-2">No silences</h3>
+          <p class="text-sm text-gray-600 mb-6">Create a silence to mute alerts during maintenance.</p>
+          <button x-show="currentUser && currentUser.role === 'admin'" @click="showAddSilence=true; silenceError=''; setNewSilenceDefaults()" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors">Create silence</button>
         </div>
       </div>
 
@@ -901,6 +957,45 @@
     </div>
   </div>
 
+  <!-- Create Silence Modal -->
+  <div x-show="showAddSilence" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" @click.self="showAddSilence=false">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md">
+      <h2 class="font-semibold mb-4">Create Silence (Maintenance Window)</h2>
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Matcher label</label>
+            <select x-model="newSilence.matcherName" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500">
+              <option value="alertname">alertname</option>
+              <option value="instance">instance</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Matcher value</label>
+            <input type="text" x-model="newSilence.matcherValue" placeholder="HighCPU or host:9090" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Start (local time)</label>
+          <input type="datetime-local" x-model="newSilence.startsAt" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">End (local time)</label>
+          <input type="datetime-local" x-model="newSilence.endsAt" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Comment</label>
+          <input type="text" x-model="newSilence.comment" placeholder="Planned maintenance" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"/>
+        </div>
+        <div x-show="silenceError" class="text-sm text-red-400" x-text="silenceError"></div>
+        <div class="flex gap-3 pt-1">
+          <button @click="createSilence()" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Create</button>
+          <button @click="showAddSilence=false" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Add Target Modal -->
   <div x-show="showAddTarget" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" @click.self="showAddTarget=false; addStep=1">
     <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-lg">
@@ -1007,6 +1102,10 @@
         channels: [],
         alertRules: [],
         alertEvents: [],
+        silences: [],
+        showAddSilence: false,
+        newSilence: { matcherName: 'alertname', matcherValue: '', startsAt: '', endsAt: '', comment: '' },
+        silenceError: '',
         showAddChannel: false,
         newChannel: { name: '', type: 'webhook', url: '', topic: '', smtp_host: '', smtp_port: 587, smtp_username: '', smtp_password: '', smtp_from: '', smtp_to: '' },
         showAddRule: false,
@@ -1347,6 +1446,57 @@
         async loadAlertEvents() {
           const res = await fetch('/api/alerts/events');
           if (res.ok) this.alertEvents = await res.json();
+        },
+
+        async loadSilences() {
+          const res = await fetch('/api/silences');
+          if (res.ok) this.silences = await res.json();
+        },
+
+        setNewSilenceDefaults() {
+          const now = new Date();
+          const end = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+          this.newSilence = {
+            matcherName: 'alertname',
+            matcherValue: '',
+            startsAt: now.toISOString().slice(0, 16),
+            endsAt: end.toISOString().slice(0, 16),
+            comment: ''
+          };
+        },
+
+        async createSilence() {
+          this.silenceError = '';
+          const startsAt = new Date(this.newSilence.startsAt).toISOString();
+          const endsAt = new Date(this.newSilence.endsAt).toISOString();
+          if (!this.newSilence.matcherValue.trim()) {
+            this.silenceError = 'Matcher value is required';
+            return;
+          }
+          const body = {
+            matchers: [{ name: this.newSilence.matcherName, value: this.newSilence.matcherValue.trim(), isRegex: false }],
+            startsAt,
+            endsAt,
+            createdBy: this.currentUser?.username || 'oms',
+            comment: this.newSilence.comment || 'Maintenance window'
+          };
+          const res = await fetch('/api/silences', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          if (res.ok) {
+            this.showAddSilence = false;
+            await this.loadSilences();
+          } else {
+            const d = await res.json().catch(() => ({}));
+            this.silenceError = d.message || ('Failed: ' + res.status);
+          }
+        },
+
+        async expireSilence(id) {
+          const res = await fetch('/api/silences/' + id, { method: 'DELETE' });
+          if (res.ok) await this.loadSilences();
         },
 
         async copyText(text) {

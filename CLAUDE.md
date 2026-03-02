@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**GitHub issues:** Use the GitHub CLI (`gh`) to view, comment, and manage issues (e.g. `gh issue view 6`, `gh issue list`). Prefer `gh` over opening URLs or guessing issue content.
+
 ## Commands
 
 ```bash

@@ -162,6 +162,10 @@ func (s *Server) setupRoutes(webFS embed.FS) {
 	lh := handlers.NewLogsHandler(s.store)
 	api.GET("/logs/query", lh.Query)
 
+	// Silences (Alertmanager proxy; requires stack up)
+	silencesH := handlers.NewSilencesHandler(s.store)
+	api.GET("/silences", silencesH.List)
+
 	// ── Admin-only writes ─────────────────────────────────────────────────────
 
 	adm := e.Group("/api", requireAdmin)
@@ -186,6 +190,10 @@ func (s *Server) setupRoutes(webFS embed.FS) {
 	adm.POST("/alerts/rules", alh.Create)
 	adm.PUT("/alerts/rules/:id", alh.Update)
 	adm.DELETE("/alerts/rules/:id", alh.Delete)
+
+	// Silences (writes)
+	adm.POST("/silences", silencesH.Create)
+	adm.DELETE("/silences/:id", silencesH.Delete)
 
 	// User management (admin only)
 	uh := handlers.NewUserHandler(s.store)
