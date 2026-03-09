@@ -1,11 +1,11 @@
 module github.com/22peacemaker/open-mon-stack
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/labstack/echo/v4 v4.15.1
 	golang.org/x/crypto v0.48.0
-	golang.org/x/time v0.14.0
+	golang.org/x/time v0.15.0
 )
 
 require (
